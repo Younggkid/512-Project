@@ -72,6 +72,9 @@ def send(receiver, amount, private_key):
     """
     
     can_afford: bool = float(amount) <= float(get_balance()[0])
+    if receiver == get_address():
+        print(f'Error while sending transaction! - You cannot send yourself money!', file=sys.stderr)
+        return False
     if can_afford:
         nonce = random()
         packet = f'{get_address()}:{receiver}:{amount}:{nonce}'
