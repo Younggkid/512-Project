@@ -2,8 +2,9 @@ import json
 import sys
 
 from time import time
-from crypto import hash
-
+from crypto import hash, valid_proof
+from urllib.parse import urlparse
+import requests
 
 class Blockchain(object):
     @property
@@ -23,6 +24,7 @@ class Blockchain(object):
         self.current_balances = {}
         self.push_time = 0
         self.mine_time = 0
+        self.nodes = set()
         # If chain already exists on disk
         try:
             with open(chain_file, 'r') as blockchain_file:
@@ -106,3 +108,50 @@ class Blockchain(object):
             else:
                 self.current_balances[sender] += self.pending_balances
         self.pending_balances = {}
+    
+    def register_node(self, address):
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)
+
+    def valid_chain(self, chain):
+        last_block = chain[0]
+        current_index = 1
+
+        while current_index < len(chain):
+            block = chain[current_index]
+            print(f"{last_block}")
+            print(f"{block}")
+            print("\n--------\n")
+            if block['previous_hash'] != self.hash(last_block):
+                return False
+            
+            if not valid_proof(block, block["proof"]):
+                return False
+            
+            last_block = block
+            current_index += 1
+        
+        return True 
+
+    def resolve_conflicts(self):
+
+        neighbours = self.nodes
+        new_chain = None
+
+        max_length = len(self.chain)
+
+        for node in neighbours:
+            response = requests.get(f'http://{node}/chain')
+
+            if response.status_code == 200:
+                length = response.json()['length']
+                chain = response.json()['chain']
+
+                if length > max_length and self.valid_chain(chain):
+                    max_length = length
+                    new_chain = chain
+        if new_chain:
+            self.chain = new_chain
+            return True
+        
+        return False
