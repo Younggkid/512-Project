@@ -56,7 +56,7 @@ class Blockchain(object):
         # Reset the current list of transactions
         block['proof'] = proof
         self.chain.append(block)
-        self.save_blockchain()
+        #self.save_blockchain()
         self.push_time = time()
         self.mine_time = time()
         self.current_balances = {}

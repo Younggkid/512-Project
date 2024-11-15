@@ -3,6 +3,7 @@
 .vscode/
 __pycache__/
 
-private_key.pem
+private_key*
 blockchain.txt
-miner_address.txt
+miner_address*
+.DS_Store

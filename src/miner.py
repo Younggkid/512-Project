@@ -1,34 +1,41 @@
 import random
 import requests
 import sys
-
+import wallet
 from time import sleep, time
 from numpy import average
-
+import re
 import blockchain
 import crypto
-NODE = "http://127.0.0.1:6000"
+#  NODE = "http://127.0.0.1:6000"
 
-try:
-    with open("miner_address.txt", "r") as address:
-        mining_address = address.read()
-except FileNotFoundError:
-    print("'miner_address.txt' not detected! Run 'run_wallet.py' first!", file=sys.stderr)
-    sys.exit(0)
 
 hash_per_second = []
 
 
 class Miner(object):
+
+    def __init__(self, NODE):
+        self.node_url = NODE
+        self.port = re.search(r'http://\d+\.\d+\.\d+\.\d+:(\d+)', self.node_url).group(1)
+        private_key_filename = f"private_key_{self.port}.pem"
+        try:
+            # Use wallet's get_address function to retrieve miner address
+            self.mining_address = wallet.get_address(private_key_filename)  
+            print('Miner address:', self.mining_address)
+        except FileNotFoundError:
+            print("'private_key.pem' not detected! Run 'run_wallet.py' first to generate keys!", file=sys.stderr)
+            sys.exit(0)
+        #self.mining_address = wallet.get_address("private_key.pem") 
+        print('Miner initialized!')
+
     @property
     def current_chain(self):
-        response = requests.get(NODE + "/chain")
+        response = requests.get(self.node_url + "/chain")
         chain = blockchain.Blockchain()
         chain.chain = response["chain"]
         return chain
 
-    def __init__(self):
-        print('Miner initialized!')
 
     def proof_of_work(self, block) -> int:
         """
@@ -53,20 +60,20 @@ class Miner(object):
 
     def mine(self):
         while True:
-            while requests.get(NODE + "/work").status_code == 204:  # Empty
+            while requests.get(self.node_url + "/work").status_code == 204:  # Empty
                 sleep(2)
-            response = requests.get(NODE + "/work")
+            response = requests.get(self.node_url + "/work")
             proof = self.proof_of_work(response.json())
             print(f'Proof found: {proof}')
             print('Sending now to node...')
-            if requests.get(NODE + "/work").status_code == 200:  # worked
+            if requests.get(self.node_url + "/work").status_code == 200:  # worked
                 print('Success! You have been rewarded with 1 $TR (to be added in next block)')
                 print()
             else:
                 print('Error! Did not send block in on-time!')
                 print()
             headers = {'User-Agent': 'Mozilla/5.0'}
-            requests.post(NODE + "/submitproof", headers=headers, data={
+            requests.post(self.node_url + "/submitproof", headers=headers, data={
                 "proof": proof,
-                "miner": mining_address
+                "miner": self.mining_address
             })

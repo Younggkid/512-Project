@@ -7,21 +7,21 @@ from random import random
 import hashlib
 import requests
 import sys
-NODE = "http://127.0.0.1:6000"
+#NODE = "http://127.0.0.1:6000"
 
 
-def generate_key():
+def generate_key(private_key_file):
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
         backend=default_backend()
     )
-    save_key(private_key)
+    save_key(private_key, private_key_file)
 
 
-def read_key():
+def read_key(private_key_file):
     # Reads private key from "private_key.pem"
-    with open("private_key.pem", "rb") as key_file:
+    with open(private_key_file, "rb") as key_file:
         private_key = serialization.load_pem_private_key(
             key_file.read(),
             password=None,
@@ -34,32 +34,36 @@ def get_public_key(private_key):
     return private_key.public_key()
 
 
-def save_key(private_key):
-    # Takes in private_key param and stores it in "private_key.pem"
+def save_key(private_key, private_key_file):
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     )
-
-    with open('private_key.pem', 'wb') as f:
+    with open(private_key_file, 'wb') as f:
         f.write(pem)
 
 
-def get_address():
-    address = hashlib.sha256(str(get_public_key(read_key()).public_bytes(
+def get_address(private_key_file):
+    address = hashlib.sha256(str(get_public_key(read_key(private_key_file)).public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )).encode()).hexdigest()
     return address
 
+def get_address_from_pk(private_key):
+    address = hashlib.sha256(str(get_public_key(private_key).public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )).encode()).hexdigest()
+    return address
 
-def save_address():
-    with open("miner_address.txt", 'w') as out:
-        out.write(get_address())
+def save_address(private_key_file, miner_address_file):
+    with open(miner_address_file, 'w') as out:
+        out.write(get_address(private_key_file))
 
 
-def send(receiver, amount, private_key):
+def send(receiver, amount, private_key, node_url):
     """
     EXAMPLE:
 
@@ -71,13 +75,13 @@ def send(receiver, amount, private_key):
     Nonce
     """
     
-    can_afford: bool = float(amount) <= float(get_balance()[0])
-    if receiver == get_address():
+    can_afford: bool = float(amount) <= float(get_balance(node_url)[0])
+    if receiver == get_address_from_pk(private_key):
         print(f'Error while sending transaction! - You cannot send yourself money!', file=sys.stderr)
         return False
     if can_afford:
         nonce = random()
-        packet = f'{get_address()}:{receiver}:{amount}:{nonce}'
+        packet = f'{get_address_from_pk(private_key)}:{receiver}:{amount}:{nonce}'
 
         bytes_package = packet.encode()
 
@@ -90,7 +94,7 @@ def send(receiver, amount, private_key):
             hashes.SHA256()
         )
 
-        response = requests.post(NODE + "/transactions/new",
+        response = requests.post(node_url + "/transactions/new",
                                  data={
                                      "transaction": packet,
                                      "signature": b64encode(signature),
@@ -106,11 +110,11 @@ def send(receiver, amount, private_key):
     return response.status_code  < 400
 
 
-def get_balance(address=None):
-    if not address:
-        address = get_address()
-    response_chain = requests.get(NODE + "/chain")
-    response_pending = requests.post(NODE + "/pendingbalance",
+def get_balance(node_url, address):
+    #if not address:
+    #    address = get_address()
+    response_chain = requests.get(node_url + "/chain")
+    response_pending = requests.post(node_url + "/pendingbalance",
                                  data={
                                      "address": address
                                  })
