@@ -13,6 +13,7 @@ import crypto
 import wallet
 
 current_chain = blockchain.Blockchain("blockchain.txt")
+validate_chain = blockchain.Blockchain("blockchain.txt")
 # Generate a globally unique address for this node
 node_identifier = str(uuid4()).replace('-', '')
 class Node:
@@ -133,13 +134,23 @@ class Node:
     def run(self):
         self.app.run(host='127.0.0.1', port=self.port, debug=False, threaded=True)
 
-
+# Current we only have the same kinds of nodes
+# Research_Node, Validator_Node, and Authority_Node are expected
 if __name__ == '__main__':
-    node1 = Node(6000, "blockchain1.txt")
-    node2 = Node(6001, "blockchain2.txt")
+    node1 = Node(6000, "blockchain.txt")
+    node2 = Node(6001, "blockchain.txt")
+    node3 = Node(6002, "blockchain.txt")
+    node4 = Node(6003, "blockchain.txt")
+    node5 = Node(6004, "blockchain.txt")
 
     t1 = threading.Thread(target=node1.run)
     t2 = threading.Thread(target=node2.run)
+    t3 = threading.Thread(target=node3.run)
+    t4 = threading.Thread(target=node4.run)
+    t5 = threading.Thread(target=node5.run)
 
     t1.start()
     t2.start()
+    t3.start()
+    t4.start()
+    t5.start()

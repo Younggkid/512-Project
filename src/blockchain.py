@@ -1,6 +1,6 @@
 import json
 import sys
-
+from block import Block, BlockState
 from time import time
 from crypto import hash, valid_proof
 from urllib.parse import urlparse
@@ -8,7 +8,7 @@ import requests
 
 class Blockchain(object):
     @property
-    def last_block(self) -> dict:
+    def last_block(self) -> Block:
         # Returns the last (header) block in the chain
         return self.chain[-1]
 
@@ -26,40 +26,65 @@ class Blockchain(object):
         self.mine_time = 0
         self.nodes = set()
         # If chain already exists on disk
-        try:
-            with open(chain_file, 'r') as blockchain_file:
-                self.chain = json.loads(blockchain_file.read())
-            return None
-        except (FileNotFoundError, json.JSONDecodeError):
-            print('Error while importing chain_file! But that is OK!', file=sys.stderr)
-            """
-            Create Testchain with default Genesis Block
-            THIS SHOULD NEVER BE CALLED!!
-                - When rolled out, this functions should instead call for a sync with the node to import the live
-                    chain
-            """
-            self.new_block(previous_hash=1, proof=100)
-
-    def new_block(self, proof, previous_hash=None) -> dict:
+        #try:
+        #   with open(chain_file, 'r') as blockchain_file:
+        #        self.chain = json.loads(blockchain_file.read())
+        #except (FileNotFoundError, json.JSONDecodeError):
+        #    print('Error while importing chain_file! But that is OK!', file=sys.stderr)
         """
-        Creates new block to add to the blockchain. Uses previous header to generate new block.
-        :param proof: <int> POW value that returns hash < predetermined target hash
-        :param previous_hash: <str> hash of current header block
-        :return: <dict> new block
+        Create chain with default Genesis Block.
+        The Genesis Block should be created by the authority
         """
-        block = {
-            'index': len(self.chain) + 1,
-            'transactions': self.current_transactions,
-            'previous_hash': previous_hash or hash(self.last_block)
+        gen_block_params = {
+            "research_address": "Autority",
+            "index": 0,
+            "previous_block_id": '-1',
+            "task_description": "Train a model",
+            "data_link": "http://data.example.com",
+            "code_link": "http://code.example.com",
+            "constraint": "Memory limit: 2GB",
+            "validator_address": None,
+            "predictions": ["class1", "class2"],
+            "state": BlockState.CONFIRM,
+            "validation_state": True,
+            "txs_list": [],
+            "digital_signature": None, #todo, should use authority's key
         }
-        self.current_transactions = []
-        # Reset the current list of transactions
-        block['proof'] = proof
-        self.chain.append(block)
-        #self.save_blockchain()
-        self.push_time = time()
-        self.mine_time = time()
-        self.current_balances = {}
+        self.new_block(**gen_block_params)
+    
+    """
+    Use the parameter list to create a new block, this should be
+    called from node.py.
+    """
+    def new_block(self, research_address,
+        index,
+        previous_block_id,
+        task_description,
+        data_link,
+        code_link,
+        constraint,
+        validator_address = None,
+        predictions = None,
+        state = None,
+        validation_state= None,
+        txs_list = None,
+        digital_signature = None) -> Block:
+        """
+        Creates new block to add to the blockchain. 
+        """
+        block = Block(research_address,
+        index,
+        previous_block_id,
+        task_description,
+        data_link,
+        code_link,
+        constraint,
+        validator_address,
+        predictions,
+        state,
+        validation_state,
+        txs_list,
+        digital_signature)
         return block
 
     def new_transaction(self, sender, recipient, amount):
