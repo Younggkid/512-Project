@@ -49,7 +49,7 @@ class Block:
         )
         return hashlib.sha256(block_string.encode()).digest()
 
-    def sign_block(self, private_key) -> None:
+    def miner_sign_block(self, private_key) -> None:
         """
         Signs the block with a private key using PSS padding and SHA-256 hashing.
         :param private_key: The private key object for signing.
@@ -83,3 +83,24 @@ class Block:
             return True
         except Exception:
             return False
+    
+    def to_dict(self) -> Dict[str, Union[str, int, bool, bytes, List[Dict], List[str], None]]:
+        """
+        Converts the block's attributes to a dictionary.
+        :return: A dictionary representation of the block.
+        """
+        return {
+            'research_address': self.research_address,
+            'validator_address': self.validator_address,
+            'index': self.index,
+            'previous_block_id': self.previous_block_id,
+            'task_description': self.task_description,
+            'data_link': self.data_link,
+            'code_link': self.code_link,
+            'constraint': self.constraint,
+            'predictions': self.predictions,
+            'state': self.state,
+            'validation_state': self.validation_state,
+            'txs_list': self.txs_list,
+            'digital_signature': self.digital_signature.hex() if self.digital_signature else None,
+        }

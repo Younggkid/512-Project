@@ -2,7 +2,10 @@ import hashlib
 import json
 from binascii import unhexlify
 
-
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.exceptions import InvalidSignature
 def hash(block) -> str:
     """
     Hashes a block
@@ -34,3 +37,19 @@ def valid_proof(block, proof, node=False) -> bool:
     guess_hash = hash(guess)
     bin_guess_hash = f"{bin(int.from_bytes(unhexlify(guess_hash), byteorder='big'))}"[::-1]  # Reverse binary string
     return bin_guess_hash[:N] == "0" * N
+
+def verify_signature(signature, packet, pub_key_serialized):
+    try:
+        pub_key = load_pem_public_key(bytes(pub_key_serialized, 'utf-8'))
+        pub_key.verify(
+            signature,
+            packet.encode(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+    except InvalidSignature:
+        return False
+    return True
