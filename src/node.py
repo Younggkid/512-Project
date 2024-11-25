@@ -1,377 +1,145 @@
 from uuid import uuid4
 
 
-# import cryptography
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding  # rsa
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
-from cryptography.exceptions import InvalidSignature
+import threading
 from flask import Flask, request
 from base64 import b64decode
-
-import time
-import multiprocessing
-import threading
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.exceptions import InvalidSignature
 import blockchain
 import crypto
 import wallet
 
-
-
-# Instantiate our Node
-app1 = Flask(__name__)
-app2 = Flask(__name__)
-
-def runFlaskApp1():
-    app1.run(host='127.0.0.1', port=6000, debug=False, threaded=True)
-
-def runFlaskApp2():
-    app2.run(host='127.0.0.1', port=6001, debug=False, threaded=True)
-
 current_chain = blockchain.Blockchain("blockchain.txt")
 # Generate a globally unique address for this node
 node_identifier = str(uuid4()).replace('-', '')
+class Node:
+    def __init__(self, port, blockchain_file):
+        self.app = Flask(__name__)
+        self.port = port
+        self.current_chain = blockchain.Blockchain(blockchain_file)
+        self.node_identifier = str(uuid4()).replace('-', '')
+        self.setup_routes()
 
+    def verify_signature(self, signature, packet, pub_key_serialized):
+        try:
+            pub_key = load_pem_public_key(bytes(pub_key_serialized, 'utf-8'))
+            pub_key.verify(
+                signature,
+                packet.encode(),
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        except InvalidSignature:
+            return False
+        return True
 
-def verifySignature(signature, packet, pubKeySerialized) -> bool:
-    # Takes in signature, public key and packet and returns true if it is a valid transaction
-    try:
-        BytesPackage = packet.encode()
-        pubKey = load_pem_public_key(bytes(pubKeySerialized, 'utf-8'))
-        pubKey.verify(
-            signature,
-            BytesPackage,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hashes.SHA256()
-        )
-    except InvalidSignature:
-        return False
-    return True
+    def setup_routes(self):
+        @self.app.route('/submitproof', methods=['POST'])
+        def submit_proof():
+            required = ['miner', 'proof']
+            if not all(p in request.form for p in required):
+                return 'Missing required transaction data', 400
 
+            if not self.current_chain.ready_to_mine():
+                return 'No block ready to mine!', 400
 
-def parse_blockchain():
-    """
-    TODO:
-    Parse blockchain and store balance for every address in blockchain as dict
-    instead of get_balance() just find balance['get_address()']
-    """
-    pass
-    coin_balances = {}
-    for block in blockchain:
-        for transaction in block["transactions"]:
-            if transaction["recipient"] not in coin_balances:
-                coin_balances[transaction["recipient"]] = transaction["amount"]
+            block = {
+                'index': len(self.current_chain.chain) + 1,
+                'transactions': self.current_chain.current_transactions,
+                'previous_hash': crypto.hash(self.current_chain.last_block)
+            }
+
+            valid = crypto.valid_proof(block, int(request.form['proof']), True)
+            REWARD = 1
+
+            if valid:
+                block = self.current_chain.new_block(request.form['proof'])
+                response = {
+                    'message': f"New Block Mined, {REWARD} $TR has been added to your account",
+                    'index': block['index'],
+                    'transactions': block['transactions'],
+                    'proof': block['proof'],
+                    'previous_hash': block['previous_hash'],
+                }
+                self.current_chain.new_transaction(
+                    sender="0",
+                    recipient=request.form['miner'],
+                    amount=REWARD,
+                )
+                return response, 200
             else:
-                coin_balances[transaction["recipient"]] += transaction["amount"]
-                coin_balances[transaction["sender"]] -= transaction[
-                    "amount"]  # Will not return negative - checked already
+                return "Invalid proof", 406
 
+        @self.app.route('/transactions/new', methods=['POST'])
+        def new_transaction():
+            required = ['transaction', 'signature', 'pubkey']
+            if not all(p in request.form for p in required):
+                return 'Missing required transaction data', 400
 
-@app1.route('/submitproof', methods=['POST'])
-def submit_proof():
-    # Listen for submissions of proofs
-    # Check if proof is valid
-    # If valid --> append block to blockchain, add miner reward to current transactions
-    required = ['miner', 'proof']
-    if not all(p in request.form for p in required):
-        return 'Missing required transaction data', 400  # Bad request
-    if not current_chain.ready_to_mine():
-        return 'No block ready to mine!', 400    # Bad Request
-    block = {
-        'index': len(current_chain.chain) + 1,
-        'transactions': current_chain.current_transactions,
-        'previous_hash': crypto.hash(current_chain.last_block)
-    }
+            transaction = request.form['transaction']
+            sender, recipient, amount = transaction.split(':')
+            amount = float(amount)
+            current_balance = self.current_chain.current_balances.get(sender, 0)
+            pending_balance = self.current_chain.pending_balances.get(sender, 0)
 
-    valid = crypto.valid_proof(block, int(request.form['proof']), True)
-    # We must receive a reward for finding the proof.
-    # The sender is "0" to signify that this node has mined a new coin.
-    # Miner reward
-    REWARD: int = 1
-    if valid:
+            valid_signature = self.verify_signature(
+                b64decode(request.form['signature']),
+                transaction,
+                request.form['pubkey']
+            )
+            valid_balance = wallet.get_balance(sender)[0] >= (amount + current_balance + pending_balance)
 
-        # Add mined block to chain
-        block = current_chain.new_block(request.form['proof'])
-        response = {
-            'message': f"New Block Mined, {REWARD} $TR has been added to your account",
-            'index': block['index'],
-            'transactions': block['transactions'],
-            'proof': block['proof'],
-            'previous_hash': block['previous_hash'],
-        }
-        current_chain.new_transaction(
-            sender="0",
-            recipient=request.form['miner'],  # Send to miner who submitted proof
-            amount=REWARD,
-        )
-        print()
-        for key in response:
-            print(f'{key}: {response[key]}')
-        print()
-        return response, 200
-    else:
-        return "Invalid proof", 406
+            if not valid_signature:
+                return "Invalid signature", 401
+            if not valid_balance:
+                return "Insufficient funds", 401
 
+            self.current_chain.new_transaction(sender, recipient, amount)
+            return "Success", 201
 
-@app1.route('/transactions/new', methods=['POST'])
-def new_transaction():
-    required = ['transaction', 'signature', 'pubkey']
-    if not all(p in request.form for p in required):
-        return 'Missing required transaction data', 400  # Bad request
+        @self.app.route('/chain', methods=['GET'])
+        def full_chain():
+            response = {
+                'chain': self.current_chain.blockchain,
+                'length': len(self.current_chain.blockchain),
+            }
+            return response, 200
 
-    # Create transaction on the chain \\ sender:recipient:amount
-    sender = request.form['transaction'].split(':')[0]
-    recipient = request.form['transaction'].split(':')[1]
-    amount = float(request.form['transaction'].split(':')[2])
-    current_balance = float(current_chain.current_balances[sender]) if sender in current_chain.current_balances.keys() else 0
-    pending_balance = float(current_chain.pending_balances[sender]) if sender in current_chain.pending_balances.keys() else 0 
-    
-    validSignature: bool = verifySignature(b64decode(request.form['signature']), request.form['transaction'], request.form['pubkey']) 
-    validBalance: bool = wallet.get_balance(sender)[0] >= (amount + pending_balance + current_balance)  
-    if not validSignature:
-        return "Invalid signature", 401  # Unauthorized
-    if not validBalance: 
-        return "Insufficient funds", 401 # Unauthorized
-    index = current_chain.new_transaction(sender, recipient, amount)
-    return "Success", 201  # Created
+        @self.app.route('/work', methods=['GET'])
+        def broadcast_work():
+            """
+            sends block to be mined
+                incoming transactions coming after block to be mined still is being mined will be added to pending_transactions
+                After set time interval, if no block has been mined (blockchain size has not increased), pending_transactions is
+                    appended to next block to be broadcasted
+            """
+            if current_chain.ready_to_push:
+                current_chain.push_pending()
+            if not current_chain.ready_to_mine():
+                return "", 204
+            response = {
+                'index': len(current_chain.chain) + 1,
+                'transactions': current_chain.current_transactions,
+                'previous_hash': crypto.hash(current_chain.last_block)
+            }
+            return response, 200
 
+    def run(self):
+        self.app.run(host='127.0.0.1', port=self.port, debug=False, threaded=True)
 
-@app1.route('/chain', methods=['GET'])
-def full_chain():
-    """
-    :return: Returns entire blockchain in memory (current_chain.blockchain)
-    """
-    response = {
-        'chain': current_chain.blockchain,
-        'length': len(current_chain.blockchain),
-    }
-    return response, 200
-
-
-@app1.route('/work', methods=['GET'])
-def broadcast_work():
-    """
-    sends block to be mined
-        incoming transactions coming after block to be mined still is being mined will be added to pending_transactions
-        After set time interval, if no block has been mined (blockchain size has not increased), pending_transactions is
-            appended to next block to be broadcasted
-    """
-    if current_chain.ready_to_push:
-        current_chain.push_pending()
-    if not current_chain.ready_to_mine():
-        return "", 204
-    response = {
-        'index': len(current_chain.chain) + 1,
-        'transactions': current_chain.current_transactions,
-        'previous_hash': crypto.hash(current_chain.last_block)
-    }
-    return response, 200
-
-
-@app1.route('/pendingbalance', methods=['POST'])
-def get_pending_balance(): 
-    required = ['address']
-    balance = 0
-    if not all(p in request.form for p in required):
-        return 'Missing address for request', 400  # Bad request
-    if request.form['address'] in current_chain.pending_balances:
-        balance = current_chain.pending_balances[request.form['address']]
-    if request.form['address'] in current_chain.current_balances:
-        balance += current_chain.current_balances[request.form['address']]
-    response = {
-        'pending': balance
-    }
-    return response, 200
-
-@app1.route('/nodes/register', methods=['POST'])
-def register_nodes():
-    values = request.get_json()
-
-    nodes = values.get('nodes')
-    if nodes is None:
-        return "Error: Please supply a valid list of nodes", 400
-
-    for node in nodes:
-        current_chain.register_node(node)
-
-    response = {
-        'message': 'New nodes have been added',
-        'total_nodes': list(current_chain.nodes),
-    }
-    return response, 201
-
-@app1.route('/nodes/resolve', methods=['GET'])
-def consensus():
-    replaced = current_chain.resolve_conflicts()
-
-    if replaced:
-        response = {
-            'message': 'Our chain was replaced',
-            'new_chain': current_chain.chain
-        }
-    else:
-        response = {
-            'message': 'Our chain is authoritative',
-            'chain': current_chain.chain
-        }
-
-    return response, 200
-
-@app2.route('/submitproof', methods=['POST'])
-def submit_proof():
-    # Listen for submissions of proofs
-    # Check if proof is valid
-    # If valid --> append block to blockchain, add miner reward to current transactions
-    required = ['miner', 'proof']
-    if not all(p in request.form for p in required):
-        return 'Missing required transaction data', 400  # Bad request
-    if not current_chain.ready_to_mine():
-        return 'No block ready to mine!', 400    # Bad Request
-    block = {
-        'index': len(current_chain.chain) + 1,
-        'transactions': current_chain.current_transactions,
-        'previous_hash': crypto.hash(current_chain.last_block)
-    }
-
-    valid = crypto.valid_proof(block, int(request.form['proof']), True)
-    # We must receive a reward for finding the proof.
-    # The sender is "0" to signify that this node has mined a new coin.
-    # Miner reward
-    REWARD: int = 1
-    if valid:
-
-        # Add mined block to chain
-        block = current_chain.new_block(request.form['proof'])
-        response = {
-            'message': f"New Block Mined, {REWARD} $TR has been added to your account",
-            'index': block['index'],
-            'transactions': block['transactions'],
-            'proof': block['proof'],
-            'previous_hash': block['previous_hash'],
-        }
-        current_chain.new_transaction(
-            sender="0",
-            recipient=request.form['miner'],  # Send to miner who submitted proof
-            amount=REWARD,
-        )
-        print()
-        for key in response:
-            print(f'{key}: {response[key]}')
-        print()
-        return response, 200
-    else:
-        return "Invalid proof", 406
-
-
-@app2.route('/transactions/new', methods=['POST'])
-def new_transaction():
-    required = ['transaction', 'signature', 'pubkey']
-    if not all(p in request.form for p in required):
-        return 'Missing required transaction data', 400  # Bad request
-
-    # Create transaction on the chain \\ sender:recipient:amount
-    sender = request.form['transaction'].split(':')[0]
-    recipient = request.form['transaction'].split(':')[1]
-    amount = float(request.form['transaction'].split(':')[2])
-    current_balance = float(current_chain.current_balances[sender]) if sender in current_chain.current_balances.keys() else 0
-    pending_balance = float(current_chain.pending_balances[sender]) if sender in current_chain.pending_balances.keys() else 0 
-    
-    validSignature: bool = verifySignature(b64decode(request.form['signature']), request.form['transaction'], request.form['pubkey']) 
-    validBalance: bool = wallet.get_balance(sender)[0] >= (amount + pending_balance + current_balance)  
-    if not validSignature:
-        return "Invalid signature", 401  # Unauthorized
-    if not validBalance: 
-        return "Insufficient funds", 401 # Unauthorized
-    index = current_chain.new_transaction(sender, recipient, amount)
-    return "Success", 201  # Created
-
-
-@app2.route('/chain', methods=['GET'])
-def full_chain():
-    """
-    :return: Returns entire blockchain in memory (current_chain.blockchain)
-    """
-    response = {
-        'chain': current_chain.blockchain,
-        'length': len(current_chain.blockchain),
-    }
-    return response, 200
-
-
-@app2.route('/work', methods=['GET'])
-def broadcast_work():
-    """
-    sends block to be mined
-        incoming transactions coming after block to be mined still is being mined will be added to pending_transactions
-        After set time interval, if no block has been mined (blockchain size has not increased), pending_transactions is
-            appended to next block to be broadcasted
-    """
-    if current_chain.ready_to_push:
-        current_chain.push_pending()
-    if not current_chain.ready_to_mine():
-        return "", 204
-    response = {
-        'index': len(current_chain.chain) + 1,
-        'transactions': current_chain.current_transactions,
-        'previous_hash': crypto.hash(current_chain.last_block)
-    }
-    return response, 200
-
-
-@app2.route('/pendingbalance', methods=['POST'])
-def get_pending_balance(): 
-    required = ['address']
-    balance = 0
-    if not all(p in request.form for p in required):
-        return 'Missing address for request', 400  # Bad request
-    if request.form['address'] in current_chain.pending_balances:
-        balance = current_chain.pending_balances[request.form['address']]
-    if request.form['address'] in current_chain.current_balances:
-        balance += current_chain.current_balances[request.form['address']]
-    response = {
-        'pending': balance
-    }
-    return response, 200
-
-@app2.route('/nodes/register', methods=['POST'])
-def register_nodes():
-    values = request.get_json()
-
-    nodes = values.get('nodes')
-    if nodes is None:
-        return "Error: Please supply a valid list of nodes", 400
-
-    for node in nodes:
-        current_chain.register_node(node)
-
-    response = {
-        'message': 'New nodes have been added',
-        'total_nodes': list(current_chain.nodes),
-    }
-    return response, 201
-
-@app2.route('/nodes/resolve', methods=['GET'])
-def consensus():
-    replaced = current_chain.resolve_conflicts()
-
-    if replaced:
-        response = {
-            'message': 'Our chain was replaced',
-            'new_chain': current_chain.chain
-        }
-    else:
-        response = {
-            'message': 'Our chain is authoritative',
-            'chain': current_chain.chain
-        }
-
-    return response, 200
 
 if __name__ == '__main__':
-    t1 = threading.Thread(target=runFlaskApp1)
-    t2 = threading.Thread(target=runFlaskApp2)
+    node1 = Node(6000, "blockchain1.txt")
+    node2 = Node(6001, "blockchain2.txt")
+
+    t1 = threading.Thread(target=node1.run)
+    t2 = threading.Thread(target=node2.run)
+
     t1.start()
     t2.start()

@@ -31,7 +31,7 @@ class Blockchain(object):
                 self.chain = json.loads(blockchain_file.read())
             return None
         except (FileNotFoundError, json.JSONDecodeError):
-            print('Error while importing chain_file! Creating temporary test chain', file=sys.stderr)
+            print('Error while importing chain_file! But that is OK!', file=sys.stderr)
             """
             Create Testchain with default Genesis Block
             THIS SHOULD NEVER BE CALLED!!
