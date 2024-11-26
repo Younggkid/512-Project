@@ -3,6 +3,9 @@ from enum import Enum
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from typing import List, Dict, Union
+
+from pandas.core.methods.to_dict import to_dict
+
 from utils import CodeSolution
 import json
 
@@ -15,8 +18,8 @@ class Block:
         previous_block_id: int,
         task_description: str,
         data_link: str,
-        constraint: str,
         code_link: CodeSolution = None,
+        constraint: str = None,
         validator_address: Union[str, None] = None,
         predictions: List[str] = None,
         state: Union[None, str] = None,
@@ -96,7 +99,7 @@ class Block:
         Converts the block's attributes to a dictionary.
         :return: A dictionary representation of the block.
         """
-        self.code_link = self.code_link.to_dict() if self.code_link else None
+        self.code_link = self.code_link.to_dict() if hasattr(self.code_link, "to_dict") else self.code_link
         return {
             'research_address': self.research_address,
             'validator_address': self.validator_address,
@@ -107,10 +110,10 @@ class Block:
             'code_link': self.code_link,
             'constraint': self.constraint,
             'predictions': self.predictions,
-            'state': self.state.hex() if self.state else None,
+            'state': self.state.hex() if hasattr(self.state, 'hex') else None,
             'validation_state': self.validation_state,
             'txs_list': self.txs_list,
-            'digital_signature': self.digital_signature.hex() if self.digital_signature else None,
+            'digital_signature': self.digital_signature.hex() if hasattr(self.digital_signature, 'hex') else None,
         }
     def to_json(self) -> str:
         """
@@ -142,3 +145,5 @@ class Block:
             txs_list=data.get('txs_list', []),
             digital_signature=bytes.fromhex(data['digital_signature']) if data.get('digital_signature') else None,
         )
+
+

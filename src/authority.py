@@ -26,6 +26,7 @@ class Task:
         self.task_name = task_name
         self.train_data = load_pickle(f"{task_data_path}/{task_name}_train.pkl")
         self.test_data = load_pickle(f"{task_data_path}/{task_name}_test.pkl")
+        self.dev_data = load_pickle(f"{task_data_path}/{task_name}_dev.pkl")
         self.unlabeled_data = load_pickle(f"{task_data_path}/{task_name}_unlabeled.pkl")
         self.performance_records = []
         self.best_performance = 0
@@ -88,6 +89,8 @@ class AuthorityAgent:
             save_pickle([self.current_task.train_data[0][data_start:data_end],
                          self.current_task.train_data[1][data_start:data_end]], f"tmp/{task_name}_{i}/train.pkl")
             save_pickle(self.current_task.unlabeled_data, f"tmp/{task_name}_{i}/unlabeled.pkl")
+            save_pickle(self.current_task.dev_data, f"tmp/{task_name}_{i}/dev.pkl")
+
         # TODO broadcast the task to the network
         predictions = [0] * len(self.current_task.test_data[1])
 
@@ -131,22 +134,25 @@ class MinerAuthority(Miner):
 
     def mine(self):
         while True:
-            response = requests.post(self.node_url + "/publishtask", json={})
-            break
             try:
                 response = requests.post(self.node_url + "/publishtask", json={})
             except Exception as error:
                 print(f'{error}')
-                return
                 time.sleep(10)
                 continue
             if response.status_code == 200:
-                print("Task published")
-                break
-                time.sleep(60)
+                # print("Task published")
+                time.sleep(600)
 
 
 
+def run_authority():
+    miner = MinerAuthority("http://127.0.0.1:6000")
+    try:
+        miner.mine()
+    except Exception as error:
+        print(f'Connection error - {error}')
+        print()
 
 
 if __name__ == "__main__":

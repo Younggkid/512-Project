@@ -5,6 +5,7 @@ from time import time
 from crypto import hash, valid_proof
 from urllib.parse import urlparse
 import requests
+from utils import CodeSolution
 
 class Blockchain(object):
     @property
@@ -41,16 +42,16 @@ class Blockchain(object):
             "previous_block_id": -1,
             "task_description": "Train a model",
             "data_link": "http://data.example.com",
-            "code_link": "http://code.example.com",
+            "code_link": CodeSolution(),
             "constraint": "Memory limit: 2GB",
             "validator_address": None,
-            "predictions": ["class1", "class2"],
+            "predictions": [0, 1],
             "state": 'semi',
             "validation_state": True,
             "txs_list": [],
             "digital_signature": None, #todo, should use authority's key
         }
-        self.new_block(**gen_block_params)
+        # self.new_block(**gen_block_params)
     
     """
     Use the parameter list to create a new block, this should be

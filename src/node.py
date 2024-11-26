@@ -12,7 +12,7 @@ import blockchain
 import crypto
 import wallet
 import requests
-from authority import AuthorityAgent
+from authority import AuthorityAgent, run_authority
 import base64
 # For now, the current chain is a global variable
 # We can change it to the local variable in every node
@@ -34,30 +34,29 @@ class Node:
         self.setup_routes()
         self.authority_link = "http://127.0.0.1:6000"
 
+
     def setup_routes(self):
         @self.app.route('/submitproof', methods=['POST'])
         def submit_proof():
-            required = ['block', 'researcher']
+            required = ['block']
             if not all(p in request.json for p in required):
                 return 'Missing required transaction data', 400
 
             if not current_chain.ready_to_mine():
                 return 'No block ready to mine!', 400
 
-            block_data = request.json.get('block')
+            block= request.get_json()['block']
             # 1. send to the authority node, here just is a relay
-            block = Block.from_dict(block_data)
-            # use dict here so that it can be serialized
-            print(block_data)
-            response = requests.post(self.authority_link + "/Rsubmitblock", json=block_data)
-
+            post_data = {"block": block}
+            response = requests.post(self.authority_link + "/Rsubmitblock", json=post_data)
+            block = Block.from_dict(block)
             REWARD = 1
 
             if response.status_code == 200:
                 # TODO, add to miner
                 block.add_new_transaction(
                     sender="0",
-                    recipient=request.json['researcher'],
+                    recipient=block.research_address,
                     amount=REWARD,
                 )
                 try:
@@ -68,6 +67,7 @@ class Node:
                     # the main chain but not validate chain
                     if authority_signature:
                         print(f"Authority signature: {authority_signature}")
+                        block.state = authority_signature
                         current_chain.add_new_block(block)
                         response = {
                             'message': "New Block Mined, should forward to validate now",
@@ -90,22 +90,29 @@ class Node:
             validation_counts = defaultdict(int)
 
             # Dictionary to store the latest block for each index
-            latest_blocks = {}
+            latest_validation_blocks = {}
 
             # Count occurrences of validation_state=True per block index
             for block in validate_chain.chain:
                 if block.validation_state:  # Only count blocks with validation_state=True
                     validation_counts[block.index] += 1
-                    latest_blocks[block.index] = block  # Keep the latest block for the index
+                    latest_validation_blocks[block.index] = block  # Keep the latest block for the index
+
 
             # Find the block with the maximum index that has at least 2 confirmations
-            eligible_blocks = [
-                block for index, block in latest_blocks.items() if validation_counts[index] >= 2
+            min_confirmations = 1
+            eligible_block_ids = [
+                block.index for index, block in latest_validation_blocks.items() if validation_counts[index] >= min_confirmations
             ]
+            # TODO change to verify according to signature
+            authority_block_ids = [block.index for block in current_chain.chain if block.research_address.lower() == "authority"]
+            eligible_block_ids = eligible_block_ids.extend(authority_block_ids)
 
-            if not eligible_blocks: # return the genius block
-                return validate_chain.chain[0].to_dict()
-            response = max(eligible_blocks, key=lambda block: block.index).to_dict()
+            if not eligible_block_ids: # return the genius block
+                main_block = current_chain.chain[0]
+            else:
+                main_block = current_chain.chain[max(eligible_block_ids)]
+            response = main_block.to_dict()
             # Return the block with the highest index
             return response, 200
 
@@ -176,33 +183,15 @@ class ANode(Node):
             # Now the authority only test the
             # performance of the model according to the prediction file
             # it submitted
-            required = ['research_address', 'predictions', 'data_link', 'code_link']
+            required = ['block']
             if not all(p in request.json for p in required):
                 print('Missing required transaction data')
                 return 'Missing required transaction data', 400
 
-            #if not current_chain.ready_to_mine():
-            #    return 'No block ready to mine!', 400
-
-            # TODO check the block format input
-            block_params = {
-                "research_address": request.json['research_address'],
-                "index": len(current_chain.chain) + 1,
-                "previous_block_id": len(current_chain.chain),
-                "task_description": "Train a model",
-                "data_link": request.json['data_link'],
-                "code_link": request.json['code_link'],
-                "constraint": "Memory limit: 2GB",
-                "validator_address": None,
-                "predictions": ["class1", "class2"],
-                "state": 'semi',
-                "validation_state": False,
-                "txs_list": current_chain.current_transactions,
-                "digital_signature": request.json['digital_signature'],
-            }
-            block = Block.from_dict(block_params)
+            block = request.get_json()['block']
+            block = Block.from_dict(block)
             # for test
-            valid = True#self.agent.verify_block(block)
+            valid, signature = self.agent.verify_block(block)
             if valid:
                 response = {
                     'authority_sign': base64.b64encode(self.agent.auth_sign_block(block)).decode('utf-8')
@@ -315,12 +304,16 @@ if __name__ == '__main__':
     # node3 = Node(6002)
     # node4 = Node(6003)
 
+    t0 = threading.Thread(target=run_authority)
     t1 = threading.Thread(target=node1.run)
     t2 = threading.Thread(target=node2.run)
     # t3 = threading.Thread(target=node3.run)
     # t4 = threading.Thread(target=node4.run)
 
+
+    t0.start()
     t1.start()
     t2.start()
     # t3.start()
     # t4.start()
+

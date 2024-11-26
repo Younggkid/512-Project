@@ -34,7 +34,7 @@ def load_pickle(filename, display=False):
 
 
 class CodeSolution:
-    def __init__(self, model_name: str, parameters: Dict):
+    def __init__(self, model_name: str="random", parameters: Dict=None):
         self.model_name = model_name
         self.parameters = parameters
     def __str__(self):

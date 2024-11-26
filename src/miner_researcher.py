@@ -56,86 +56,96 @@ class MinerResearcher(Miner):
 
 
     def mine(self):
-        # TODO: wait for the request implementation
-        # previous_block = requests.get(self.node_url + "/chain").json()["chain"][-1]
-        previous_block = Block(
-            research_address="research_address",
-            index=0,
-            previous_block_id=0,
-            task_description="task_description",
-            data_link=f"tmp/digits_0",
-            constraint="constraint",
-            code_link=CodeSolution("logistic_regression", {"C": 0.01, "max_iter": 100})
-        )
+        failed_attempts = 0
+        successful_attempts = 0
+        while True and failed_attempts < 3:
+            # shuffle the self.parameters_list
+            for model_name in self.model_sets:
+                random.shuffle(self.parameters_list[model_name])
+            responses = requests.get(self.node_url + "/MainChainBlock")
+            previous_block = Block.from_dict(responses.json())
 
-        unlabeled_data = load_pickle(os.path.join(previous_block.data_link, "unlabeled.pkl"))
+            unlabeled_data = load_pickle(os.path.join(previous_block.data_link, "unlabeled.pkl"))
 
 
-        current_dataset_idx = int(previous_block.data_link.split("_")[-1])
-        dataset_path = "_".join(previous_block.data_link.split("_")[:-1])
-        original_train_data = load_pickle(os.path.join(f"{dataset_path}_{current_dataset_idx}", "train.pkl"))
-        X_train, X_dev, y_train, y_dev = train_test_split(original_train_data[0], original_train_data[1], test_size=0.2, random_state=42)
-        dev_data = (X_dev, y_dev)
-        train_data = (X_train, y_train)
+            current_dataset_idx = int(previous_block.data_link.split("_")[-1])
+            dataset_path = "_".join(previous_block.data_link.split("_")[:-1])
+            train_data = load_pickle(os.path.join(f"{dataset_path}_{current_dataset_idx}", "train.pkl"))
+            dev_data = load_pickle(os.path.join(f"{dataset_path}_{current_dataset_idx}", "dev.pkl"))
 
-        # for debug
-        test_data = load_pickle(os.path.join(f"data/digits_test.pkl"))
-
-
-        valid = False
-        best_model_name = None
-        best_params = None
-        previous_model = run_model_code(train_data, previous_block.code_link)
-        previous_score = previous_model.score(dev_data[0], dev_data[1])
-        previous_test_score = previous_model.score(test_data[0], test_data[1])
-
-        # Model selection and add data if needed
-        while True and current_dataset_idx < 10:
-            # random sleep for 0-5 seconds
-            # random.seed(time() + self.port)
-            # sleep(np.random.randint(0, 6))
-
-            new_train_data = load_pickle(os.path.join(f"{dataset_path}_{current_dataset_idx}","train.pkl"))
-            curr_train_data_len = len(train_data[1])
-            additional_X_train, additional_y_train = new_train_data[0][curr_train_data_len:], new_train_data[1][curr_train_data_len:]
-            train_data = (np.concatenate((train_data[0], additional_X_train)), np.concatenate((train_data[1], additional_y_train)))
+            # for debug
+            task_name = previous_block.task_description
+            test_data = load_pickle(os.path.join(f"data/{task_name}_test.pkl"))
 
 
-            best_score, best_model_name, best_params = self.search_best_model(train_data, dev_data, previous_score)
-            best_model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
-            test_score = best_model.score(test_data[0], test_data[1])
-            print(current_dataset_idx, test_score)
+            valid = False
+            best_model_name = None
+            best_params = None
+            previous_model = run_model_code(train_data, previous_block.code_link)
+            previous_score = previous_model.score(dev_data[0], dev_data[1])
+            previous_test_score = previous_model.score(test_data[0], test_data[1])
+            print("previous test score", previous_test_score)
+
+            # Model selection and add data if needed
+            while True and current_dataset_idx < 10:
+                # random sleep for 0-5 seconds
+                # random.seed(time() + self.port)
+                # sleep(np.random.randint(0, 6))
+
+                train_data = load_pickle(os.path.join(f"{dataset_path}_{current_dataset_idx}", "train.pkl"))
 
 
-            if  best_score > previous_score:
-                valid = True
-                break
+                best_score, best_model_name, best_params = self.search_best_model(train_data, dev_data, previous_score)
+                best_model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
+                test_score = best_model.score(test_data[0], test_data[1])
+                print("current test score", current_dataset_idx, test_score)
+
+                if  best_score > previous_score:
+                    valid = True
+                    break
+                else:
+                    current_dataset_idx += 1
+
+
+            if valid:
+                model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
+
+                result = model.score(test_data[0], test_data[1])
+                predictions = model.predict(unlabeled_data).tolist()
+
+                block = Block(
+                    research_address=self.mining_address,
+                    index=previous_block.index + 1,
+                    previous_block_id=previous_block.index,
+                    task_description=previous_block.task_description,
+                    data_link=f"{dataset_path}_{current_dataset_idx}",
+                    constraint=previous_block.constraint,
+                    code_link=CodeSolution(best_model_name, best_params),
+                    predictions=predictions
+                )
+                block_data = block.to_dict()
+                response = {
+                    "block": block_data
+                }
+                response = requests.post(self.node_url+"/submitproof", json=response)
+                if response.status_code == 200:
+                    successful_attempts += 1
+                    print(f"successfully mined {successful_attempts}")
+                else:
+                    failed_attempts += 1
             else:
-                current_dataset_idx += 1
+                failed_attempts += 1
+        print("Summary for this miner:")
+        print(f"Successful attempts: {successful_attempts}")
+        print(f"Failed attempts: {failed_attempts}")
 
 
-        if valid:
-            model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
-
-            result = model.score(test_data[0], test_data[1])
-            predictions = model.predict(unlabeled_data)
-
-            block = Block(
-                research_address=self.mining_address,
-                index=previous_block.index + 1,
-                previous_block_id=previous_block.index,
-                task_description=previous_block.task_description,
-                data_link=f"{dataset_path}_{current_dataset_idx}",
-                constraint=previous_block.constraint,
-                code_link=CodeSolution(best_model_name, best_params),
-                predictions=predictions
-            )
 
 
 
 
 if __name__ == "__main__":
-    node_url = f"http://127.0.0.1:6000"
+    node_url = f"http://127.0.0.1:6001"
     miner = MinerResearcher(node_url)
     miner.mine()
 

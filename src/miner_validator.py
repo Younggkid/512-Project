@@ -23,7 +23,8 @@ class MinerValidator(Miner):
         pass
 
     def mine(self):
-        # main_block = requests.get(self.node_url + "/chain").json()["chain"][-1]
+        main_block = requests.get(self.node_url + "/MainChainBlock").json()
+
         main_block = Block(
             research_address="research_address",
             index=0,
