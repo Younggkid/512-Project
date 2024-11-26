@@ -63,6 +63,7 @@ class Miner(object):
             while requests.get(self.node_url + "/work").status_code == 204:  # Empty
                 sleep(2)
             response = requests.get(self.node_url + "/work")
+
             proof = self.proof_of_work(response.json())
             print(f'Proof found: {proof}')
             print('Sending now to node...')

@@ -20,7 +20,7 @@ class Block:
         constraint: str,
         validator_address: Union[str, None] = None,
         predictions: List[str] = None,
-        state: Union[None, BlockState] = None,
+        state: Union[None, str] = None,
         validation_state: Union[None, bool] = None,
         txs_list: List[Dict] = None,
         digital_signature: Union[bytes, None] = None,

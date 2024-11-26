@@ -10,14 +10,13 @@ import re
 import blockchain
 import crypto
 
-class MinerAuthority(Miner):
+class MinerResearcher(Miner):
     def __init__(self, NODE):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
-        print('Miner Authority initialized!')
+        print('Miner Researcher initialized!')
 
-    def validate_block(self, block):
-        pass
 
     def mine(self):
         pass
+
