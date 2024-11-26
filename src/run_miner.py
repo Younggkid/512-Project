@@ -5,18 +5,16 @@ import argparse
 from os import path
 import sys
 from miner_researcher import MinerResearcher
+from miner_validator import MinerValidator
+from authority import MinerAuthority
+import threading
+
 from authority import MinerAuthority
 import subprocess
+import sys
 
-# parser = argparse.ArgumentParser(description='Run the miner')
-# parser.add_argument('-p', '--port', type=int, default=6000, help='Port of the node to connect to')
-# args = parser.parse_args()
-# node_url = f"http://127.0.0.1:{args.port}"
-authority_node_url = f"http://127.0.0.1:6000"
-research_node_url = f"http://127.0.0.1:6001"
 
-# subprocess.run(["python", "run_wallet.py", "-p 6000"], check=True)
-# subprocess.run(["python", "run_wallet.py", "-p 6001"], check=True)
+
 try:
     with open("miner_address_6000.txt", "r") as address:
         mining_address = address.read()
@@ -24,14 +22,30 @@ except FileNotFoundError:
     print("'miner_address.txt' not detected! Run 'run_wallet.py' first!", file=sys.stderr)
     sys.exit(0)
 
-research_miner = MinerResearcher(research_node_url)
-# miner = miner.Miner(node_url)
-print()
-try:
-    # miner.mine()
-    # authority_miner.mine()
-    research_miner.mine()
-except Exception as error:
-    print(f'Connection error - {error}')
-    print()
-    print('Please check your internet connection. Is the node online?')
+
+authority_node_url = f"http://127.0.0.1:6000"
+research_node_urls = [
+        "http://127.0.0.1:6001",
+        "http://127.0.0.1:6002",
+        "http://127.0.0.1:6003"
+    ]
+
+validator_node_urls = [
+    "http://127.0.0.1:6004",
+    "http://127.0.0.1:6005",
+    "http://127.0.0.1:6006"]
+
+with open("output.txt", "w", buffering=1) as f:
+    sys.stdout = f
+    t = threading.Thread(target=MinerAuthority(authority_node_url).mine)
+    t.start()
+
+    for node_url in research_node_urls:
+        threading.Thread(target=MinerResearcher(node_url).mine).start()
+
+    for node_url in validator_node_urls:
+        threading.Thread(target=MinerValidator(node_url).mine).start()
+    t.join()
+    sys.stdout = sys.__stdout__
+
+

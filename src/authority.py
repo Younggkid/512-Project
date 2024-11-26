@@ -16,6 +16,7 @@ import time
 import json
 from time import sleep
 from utils import CodeSolution
+from datetime import datetime
 
 # For now, the current chain is a global variable
 # We can change it to the local variable in every node
@@ -33,10 +34,8 @@ class Task:
         self.best_performance = 0
 
     def evaluate(self, predictions: list):
-        if self.task_name == "digits":
-            return sum([1 for i in range(len(predictions)) if predictions[i] == self.test_data[1][i]]) / len(predictions)
-        elif self.task_name == "iris":
-            return sum([1 for i in range(len(predictions)) if predictions[i] == self.test_data[1][i]]) / len(predictions)
+
+        return sum([1 for i in range(len(predictions)) if predictions[i] == self.test_data[1][i]]) / len(predictions)
 
     def evaluate_block(self, block: Block):
         is_best = False
@@ -54,10 +53,11 @@ class Task:
 class AuthorityAgent:
     def __init__(self, task_data_path="data"):
         self.private_key = wallet.read_key("private_key.pem")
-        self.task_name_queue = ["digits", "iris"]
+        self.task_name_queue = ["digits", "iris", "wine", "breast_cancer"]
         self.task_name_queue = self.task_name_queue * 10
         self.current_task = None
         self.task_history = []
+
 
 
     def auth_sign_block(self, block):
@@ -81,7 +81,7 @@ class AuthorityAgent:
         if self.current_task:
             self.task_history.append(self.current_task)
         self.current_task = Task(task_name)
-        print(f"New task-{len(self.task_history)} published: {task_name}")
+
         # save the train data to a link in 10 pieces, make it convenient for the research miner to simulate the data increment process
         for i in range(10):
             data_len = len(self.current_task.train_data[0])
@@ -131,6 +131,7 @@ class MinerAuthority(Miner):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
         print('Miner Authority initialized!')
+        self.print_prefix = f"Authority - {self.port}:"
 
 
     def mine(self):
@@ -142,6 +143,8 @@ class MinerAuthority(Miner):
                 time.sleep(10)
                 continue
             if response.status_code == 200:
+                message = response.json()['message']
+                self.print(message)
                 # print("Task published")
                 time.sleep(60)
 

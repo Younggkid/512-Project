@@ -9,7 +9,7 @@ import blockchain
 import crypto
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
-#  NODE = "http://127.0.0.1:6000"
+from datetime import datetime
 
 
 hash_per_second = []
@@ -94,3 +94,7 @@ class Miner(object):
                 "proof": proof,
                 "miner": self.mining_address
             })
+
+    def print(self, *args):
+        current_time = datetime.now().strftime("%H:%M:%S")
+        print(f"[{current_time}]{self.print_prefix} ", *args)

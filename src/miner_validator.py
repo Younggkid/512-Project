@@ -81,16 +81,13 @@ class MinerValidator(Miner):
                 self.print("Validation block not published")
                 failed_attempts += 1
                 sleep(10)
-    def print(self, *args):
-        current_time = datetime.now().strftime("%H:%M:%S")
-        print(f"[{current_time}]{self.print_prefix} ", *args)
 
 
 if __name__ == "__main__":
     # researcher_node_url = f"http://127.0.0.1:6001"
-    node_url1 = f"http://127.0.0.1:6002"
-    node_url2 = f"http://127.0.0.1:6003"
-    node_url3 = f"http://127.0.0.1:6004"
+    node_url1 = f"http://127.0.0.1:6004"
+    node_url2 = f"http://127.0.0.1:6005"
+    node_url3 = f"http://127.0.0.1:6006"
     miner_validator1 = MinerValidator(node_url1)
     miner_validator2 = MinerValidator(node_url2)
     miner_validator3 = MinerValidator(node_url3)

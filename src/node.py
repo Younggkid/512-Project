@@ -178,9 +178,9 @@ class ANode(Node):
 
             if block:
                 current_chain.add_new_block(block)
-                print(f"New block is published: {block}")
+                # print(f"New block is published: {block}")
                 block_data = block.to_dict()
-                response = {"message": f"New block is published, {block.task_description}","block": block_data}
+                response = {"message": f"New task is published, {block.task_description}","block": block_data}
                 return response, 200
             else:
                 return 'No block is published', 400
@@ -302,23 +302,15 @@ class VNode(Node):
  
 if __name__ == '__main__':
     node0 = ANode(6000)
-    node1 = Node(6001)
-    node2 = VNode(6002)
-    node3 = VNode(6003)
-    node4 = VNode(6004)
-
-    t_a = threading.Thread(target=run_authority)
-    t0 = threading.Thread(target=node0.run)
-    t1 = threading.Thread(target=node1.run)
-    t2 = threading.Thread(target=node2.run)
-    t3 = threading.Thread(target=node3.run)
-    t4 = threading.Thread(target=node4.run)
+    # threading.Thread(target=run_authority).start()
+    threading.Thread(target=node0.run).start()
 
 
-    t_a.start()
-    t0.start()
-    t1.start()
-    t2.start()
-    t3.start()
-    t4.start()
+    research_node_ports = [6001, 6002, 6003]
+    validator_node_ports = [6004, 6005, 6006]
+    for port in research_node_ports:
+        threading.Thread(target=Node(port).run).start()
+    for port in validator_node_ports:
+        threading.Thread(target=VNode(port).run).start()
+
 

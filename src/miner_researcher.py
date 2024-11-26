@@ -23,6 +23,7 @@ import sys
 import numpy as np
 from utils import CodeSolution, init_parameters_list, run_model_code
 from collections import Counter
+import threading
 
 
 
@@ -31,7 +32,7 @@ class MinerResearcher(Miner):
     def __init__(self, NODE):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
-        print('Miner Researcher initialized!')
+        print(f'Miner Researcher initialized in port {self.port}!')
         self.model_sets = ["logistic_regression", "svm"]
         self.parameters_list = init_parameters_list()
         self.print_prefix = f"RMiner - {self.port}:"
@@ -90,9 +91,9 @@ class MinerResearcher(Miner):
 
             # Model selection and add data if needed
             while True and current_dataset_idx < 10:
-                # random sleep for 0-5 seconds
-                # random.seed(time() + self.port)
-                # sleep(np.random.randint(0, 6))
+                # random sleep for 0-2 seconds
+                np.random.seed(int(time()) + int(self.port))
+                sleep(np.random.randint(0, 3))
 
                 train_data = load_pickle(os.path.join(f"{dataset_path}_{current_dataset_idx}", "train.pkl"))
 
@@ -108,7 +109,6 @@ class MinerResearcher(Miner):
                     valid = True
                     model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
 
-                    result = model.score(test_data[0], test_data[1])
                     predictions = model.predict(unlabeled_data).tolist()
 
                     block = Block(
@@ -132,7 +132,7 @@ class MinerResearcher(Miner):
                         failed_attempts = 0
                         index = response.json()["index"]
                         task_name = block.task_description
-                        self.print(f"Successfully mined Block-{index}. Dev score: {round(best_score, 2)}. Task: {task_name}. Total successful attempts: {successful_attempts}")
+                        self.print(f"Successfully mined Block-{index}. Test score: {round(test_score, 2)}. Task: {task_name}. Total successful attempts: {successful_attempts}")
                         sleep(1)
                         break
                     else:
@@ -152,9 +152,7 @@ class MinerResearcher(Miner):
         self.print(f"Successful attempts: {successful_attempts}")
         self.print(f"Failed attempts: {failed_attempts}")
 
-    def print(self, *args):
-        current_time = datetime.now().strftime("%H:%M:%S")
-        print(f"[{current_time}]{self.print_prefix} ", *args)
+
 
 
 
@@ -163,8 +161,13 @@ class MinerResearcher(Miner):
 
 
 if __name__ == "__main__":
-    node_url = f"http://127.0.0.1:6001"
-    miner = MinerResearcher(node_url)
-    miner.mine()
+    node_urls = [
+        "http://127.0.0.1:6001",
+        "http://127.0.0.1:6002",
+        "http://127.0.0.1:6003"
+    ]
+
+    for node_url in node_urls:
+        threading.Thread(target=MinerResearcher(node_url).mine).start()
 
 
