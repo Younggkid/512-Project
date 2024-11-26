@@ -1,6 +1,6 @@
 import json
 import sys
-from block import Block, BlockState
+from block import Block
 from time import time
 from crypto import hash, valid_proof
 from urllib.parse import urlparse
@@ -38,14 +38,14 @@ class Blockchain(object):
         gen_block_params = {
             "research_address": "Autority",
             "index": 0,
-            "previous_block_id": '-1',
+            "previous_block_id": -1,
             "task_description": "Train a model",
             "data_link": "http://data.example.com",
             "code_link": "http://code.example.com",
             "constraint": "Memory limit: 2GB",
             "validator_address": None,
             "predictions": ["class1", "class2"],
-            "state": BlockState.CONFIRM,
+            "state": 'semi',
             "validation_state": True,
             "txs_list": [],
             "digital_signature": None, #todo, should use authority's key
@@ -85,7 +85,12 @@ class Blockchain(object):
         validation_state,
         txs_list,
         digital_signature)
+        self.chain.append(block)
         return block
+    def add_new_block(self, block):
+        self.chain.append(block)
+
+        
 
     def new_transaction(self, sender, recipient, amount):
         """

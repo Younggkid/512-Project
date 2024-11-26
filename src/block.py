@@ -3,17 +3,15 @@ from enum import Enum
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from typing import List, Dict, Union
-class BlockState(Enum):
-    SEMI_CONFIRM = "semi-confirm"
-    CONFIRM = "confirm"
-    MINED = "mined"
+
+
 
 class Block:
     def __init__(
         self,
         research_address: str,
         index: int,
-        previous_block_id: str,
+        previous_block_id: int,
         task_description: str,
         data_link: str,
         code_link: str,
@@ -83,7 +81,15 @@ class Block:
             return True
         except Exception:
             return False
-    
+        
+    def add_new_transaction(self,sender, recipient, amount):
+        self.txs_list.append(
+            {
+                'sender': sender,
+                'recipient': recipient,
+                'amount': amount,
+            })
+
     def to_dict(self) -> Dict[str, Union[str, int, bool, bytes, List[Dict], List[str], None]]:
         """
         Converts the block's attributes to a dictionary.
@@ -104,3 +110,26 @@ class Block:
             'txs_list': self.txs_list,
             'digital_signature': self.digital_signature.hex() if self.digital_signature else None,
         }
+    
+    @staticmethod
+    def from_dict(data: Dict[str, Union[str, int, bool, None, List[Dict], List[str]]]) -> 'Block':
+        """
+        Creates a Block object from a dictionary.
+        :param data: A dictionary representation of a Block.
+        :return: A Block object.
+        """
+        return Block(
+            research_address=data['research_address'],
+            index=data['index'],
+            previous_block_id=data['previous_block_id'],
+            task_description=data['task_description'],
+            data_link=data['data_link'],
+            code_link=data['code_link'],
+            constraint=data['constraint'],
+            validator_address=data.get('validator_address'),
+            predictions=data.get('predictions', []),
+            state=data.get('state'),
+            validation_state=data.get('validation_state'),
+            txs_list=data.get('txs_list', []),
+            digital_signature=bytes.fromhex(data['digital_signature']) if data.get('digital_signature') else None,
+        )
