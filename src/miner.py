@@ -7,6 +7,8 @@ from numpy import average
 import re
 import blockchain
 import crypto
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 #  NODE = "http://127.0.0.1:6000"
 
 
@@ -19,6 +21,7 @@ class Miner(object):
         self.node_url = NODE
         self.port = re.search(r'http://\d+\.\d+\.\d+\.\d+:(\d+)', self.node_url).group(1)
         private_key_filename = f"private_key_{self.port}.pem"
+        self.private_key = wallet.read_key(private_key_filename)
         try:
             # Use wallet's get_address function to retrieve miner address
             self.mining_address = wallet.get_address(private_key_filename)  
@@ -35,6 +38,19 @@ class Miner(object):
         chain = blockchain.Blockchain()
         chain.chain = response["chain"]
         return chain
+
+
+    def auth_sign_block(self, block):
+        block_hash = block.calculate_hash()
+        signature = self.private_key.sign(
+            block_hash,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return signature
 
 
     def proof_of_work(self, block) -> int:

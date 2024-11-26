@@ -11,11 +11,13 @@ import blockchain
 import crypto
 from block import Block
 from utils import CodeSolution, run_model_code, load_pickle
+from miner_researcher import MinerResearcher
 
 class MinerValidator(Miner):
     def __init__(self, NODE):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
+        self.print_prefix = f"VMiner - {self.port}:"
         print('Miner Validator initialized!')
 
 
@@ -23,8 +25,15 @@ class MinerValidator(Miner):
     def mine(self):
         failed_attempts = 0
         successful_attempts = 0
-        while True and failed_attempts < 1:
-            main_block = requests.get(self.node_url + "/VMainChainBlock").json()
+        while True and failed_attempts < 20:
+            response = requests.get(self.node_url + "/VMainChainBlock")
+            if response.status_code != 200:
+                self.print("Failed to get main block")
+                failed_attempts += 1
+                sleep(5)
+                continue
+
+            main_block = response.json()
             main_block = Block.from_dict(main_block)
 
             # main_block = Block(
@@ -39,7 +48,7 @@ class MinerValidator(Miner):
             # )
             train_data = load_pickle(main_block.data_link + "/train.pkl")
             unlabeled_data = load_pickle(main_block.data_link + "/unlabeled.pkl")
-            reproduced_model = run_model_code(main_block, main_block.code_link)
+            reproduced_model = run_model_code(train_data, main_block.code_link)
             predictions = reproduced_model.predict(unlabeled_data).tolist()
 
             # compare the predictions with the main block's predictions
@@ -55,15 +64,28 @@ class MinerValidator(Miner):
             # validator signs the block
             signature = self.auth_sign_block(validation_block)
             validation_block.digital_signature = signature
+            json_data = {"block": validation_block.to_dict()}
             # publish the validation block
-            response = requests.post(self.node_url + "/Vsubmitproof", json=validation_block.to_dict())
+            response = requests.post(self.node_url + "/Vsubmitproof", json=json_data)
             if response.status_code == 200:
-                print("Validation block published")
+                self.print("Validation block published")
                 successful_attempts += 1
             else:
-                print("Validation block not published")
+                self.print("Validation block not published")
                 failed_attempts += 1
                 sleep(10)
+    def print(self, *args):
+        print(f"{self.print_prefix} ", *args)
+
+
+if __name__ == "__main__":
+    # researcher_node_url = f"http://127.0.0.1:6001"
+    node_url = f"http://127.0.0.1:6002"
+    miner_validator = MinerValidator(node_url)
+    # miner_researcher = MinerResearcher(researcher_node_url)
+
+    # miner_researcher.mine()
+    miner_validator.mine()
 
 
 

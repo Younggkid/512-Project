@@ -4,8 +4,6 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from typing import List, Dict, Union
 
-from pandas.core.methods.to_dict import to_dict
-
 from utils import CodeSolution
 import json
 

@@ -68,6 +68,7 @@ class Node:
                     if authority_signature:
                         print(f"Authority signature: {authority_signature}")
                         block.state = authority_signature
+                        # TODO, add signature
                         current_chain.add_new_block(block)
                         response = {
                             'message': "New Block Mined, should forward to validate now",
@@ -145,6 +146,7 @@ class Node:
         
 
     def run(self):
+        print(f"Node is running on port {self.port}")
         self.app.run(host='127.0.0.1', port=self.port, debug=False, threaded=True)
 
 
@@ -164,8 +166,6 @@ class ANode(Node):
             required = []
             if not all(p in request.json for p in required):
                 return 'Missing required transaction data', 400
-
-
 
             block = self.agent.publish_task()
             if block:
@@ -207,29 +207,27 @@ class VNode(Node):
         super().__init__(port)
         self.address = wallet.get_address(f"private_key_{port}.pem")
 
-    def vnode_setup_routes(self):
+    def setup_routes(self):
         @self.app.route('/Vsubmitproof', methods=['POST'])
         def validator_submit_proof():
-            required = ['block', 'validator', 'vote']
+            required = ["block"]
             if not all(p in request.json for p in required):
                 return 'Missing required transaction data', 400
 
-            if not current_chain.ready_to_mine():
-                return 'No block ready to mine!', 400
+            # if not current_chain.ready_to_mine():
+            #     return 'No block ready to mine!', 400
 
             # validator mined block
             block_data = request.json.get('block')
             block = Block.from_dict(block_data)
 
-            vote = request.json.get('vote')
-            block.validation_status = vote
 
             REWARD = 0.001
 
             validate_chain.add_new_block(block)
             block.add_new_transaction(
                 sender="0",
-                recipient=request.json['validator'],
+                recipient=block.validator_address,
                 amount=REWARD,
             )
 
@@ -298,21 +296,21 @@ if __name__ == '__main__':
     node0 = ANode(6000)
     node1 = Node(6001)
     node2 = VNode(6002)
-    node3 = VNode(6003)
-    node4 = VNode(6004)
+    # node3 = VNode(6003)
+    # node4 = VNode(6004)
 
     t_a = threading.Thread(target=run_authority)
     t0 = threading.Thread(target=node0.run)
     t1 = threading.Thread(target=node1.run)
     t2 = threading.Thread(target=node2.run)
-    t3 = threading.Thread(target=node3.run)
-    t4 = threading.Thread(target=node4.run)
+    # t3 = threading.Thread(target=node3.run)
+    # t4 = threading.Thread(target=node4.run)
 
 
     t_a.start()
     t0.start()
     t1.start()
     t2.start()
-    t3.start()
-    t4.start()
+    # t3.start()
+    # t4.start()
 

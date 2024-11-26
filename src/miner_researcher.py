@@ -1,5 +1,3 @@
-from debugpy.common.timestamp import current
-
 from miner import Miner
 
 import random
@@ -33,7 +31,7 @@ class MinerResearcher(Miner):
         print('Miner Researcher initialized!')
         self.model_sets = ["logistic_regression", "svm"]
         self.parameters_list = init_parameters_list()
-        print(self.parameters_list)
+        self.print_prefix = f"RMiner - {self.port}:"
 
 
     def search_best_model(self, train_data, dev_data, previous_score):
@@ -58,7 +56,7 @@ class MinerResearcher(Miner):
     def mine(self):
         failed_attempts = 0
         successful_attempts = 0
-        while True and failed_attempts < 3:
+        while True and failed_attempts < 20:
             # shuffle the self.parameters_list
             for model_name in self.model_sets:
                 random.shuffle(self.parameters_list[model_name])
@@ -84,7 +82,8 @@ class MinerResearcher(Miner):
             previous_model = run_model_code(train_data, previous_block.code_link)
             previous_score = previous_model.score(dev_data[0], dev_data[1])
             previous_test_score = previous_model.score(test_data[0], test_data[1])
-            print("previous test score", previous_test_score)
+            previous_dev_score = previous_model.score(dev_data[0], dev_data[1])
+            self.print("previous test score", previous_test_score, "previous dev score", previous_dev_score)
 
             # Model selection and add data if needed
             while True and current_dataset_idx < 10:
@@ -98,7 +97,7 @@ class MinerResearcher(Miner):
                 best_score, best_model_name, best_params = self.search_best_model(train_data, dev_data, previous_score)
                 best_model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
                 test_score = best_model.score(test_data[0], test_data[1])
-                print("current test score", current_dataset_idx, test_score)
+                self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "best score:", best_score)
 
                 if  best_score > previous_score:
                     valid = True
@@ -130,14 +129,20 @@ class MinerResearcher(Miner):
                 response = requests.post(self.node_url+"/submitproof", json=response)
                 if response.status_code == 200:
                     successful_attempts += 1
-                    print(f"successfully mined {successful_attempts}")
+                    self.print(f"successfully mined {successful_attempts}")
                 else:
                     failed_attempts += 1
+                    self.print("New solution is not valid")
+                    sleep(10)
             else:
                 failed_attempts += 1
-        print("Summary for this miner:")
-        print(f"Successful attempts: {successful_attempts}")
-        print(f"Failed attempts: {failed_attempts}")
+        self.print("Summary for this miner:")
+        self.print(f"Successful attempts: {successful_attempts}")
+        self.print(f"Failed attempts: {failed_attempts}")
+
+    def print(self, *args):
+        print(f"{self.print_prefix} ", *args)
+
 
 
 

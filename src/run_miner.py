@@ -23,13 +23,13 @@ try:
 except FileNotFoundError:
     print("'miner_address.txt' not detected! Run 'run_wallet.py' first!", file=sys.stderr)
     sys.exit(0)
-authority_miner = MinerAuthority(authority_node_url)
+
 research_miner = MinerResearcher(research_node_url)
 # miner = miner.Miner(node_url)
 print()
 try:
     # miner.mine()
-    authority_miner.mine()
+    # authority_miner.mine()
     research_miner.mine()
 except Exception as error:
     print(f'Connection error - {error}')
