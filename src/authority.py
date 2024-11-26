@@ -39,6 +39,8 @@ class Task:
 
     def evaluate_block(self, block: Block):
         is_best = False
+        if block.task_description != self.task_name:
+            return False
         block_performance = self.evaluate(block.predictions)
         self.performance_records.append([block.index, block_performance])
         if block_performance > self.best_performance:
@@ -77,7 +79,6 @@ class AuthorityAgent:
             print("No task in the queue")
             return None
         task_name = self.task_name_queue.pop(0)
-        task_name = self.task_name_queue[0]
         if self.current_task:
             self.task_history.append(self.current_task)
         self.current_task = Task(task_name)

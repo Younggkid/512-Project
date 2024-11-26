@@ -8,6 +8,7 @@ from miner_researcher import MinerResearcher
 from miner_validator import MinerValidator
 from authority import MinerAuthority
 import threading
+from time import sleep
 
 from authority import MinerAuthority
 import subprocess
@@ -39,6 +40,7 @@ with open("output.txt", "w", buffering=1) as f:
     sys.stdout = f
     t = threading.Thread(target=MinerAuthority(authority_node_url).mine)
     t.start()
+    sleep(1)
 
     for node_url in research_node_urls:
         threading.Thread(target=MinerResearcher(node_url).mine).start()

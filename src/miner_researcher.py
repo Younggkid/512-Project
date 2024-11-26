@@ -133,12 +133,12 @@ class MinerResearcher(Miner):
                         index = response.json()["index"]
                         task_name = block.task_description
                         self.print(f"Successfully mined Block-{index}. Test score: {round(test_score, 2)}. Task: {task_name}. Total successful attempts: {successful_attempts}")
-                        sleep(1)
+                        sleep(2)
                         break
                     else:
                         # self.print(f"New solution is not valid for Block-{block.index}")
                         current_dataset_idx += 1
-                        sleep(5)
+                        sleep(2)
                 else:
                     current_dataset_idx += 1
 
