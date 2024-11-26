@@ -69,6 +69,7 @@ class Node:
                         print(f"Authority signature: {authority_signature}")
                         block.state = authority_signature
                         # TODO, add signature
+                        block.index = len(current_chain.chain)
                         current_chain.add_new_block(block)
                         response = {
                             'message': "New Block Mined, should forward to validate now",
@@ -101,7 +102,7 @@ class Node:
 
 
             # Find the block with the maximum index that has at least 2 confirmations
-            min_confirmations = 1
+            min_confirmations = 2
             eligible_block_ids = [
                 block.index for index, block in latest_validation_blocks.items() if validation_counts[index] >= min_confirmations
             ]
@@ -110,9 +111,14 @@ class Node:
             eligible_block_ids.extend(authority_block_ids)
 
             if not eligible_block_ids: # return the genius block
-                main_block = current_chain.chain[0]
+                if len(current_chain.chain) > 0:
+                    main_block = current_chain.chain[0]
+                else:
+                    main_block = None
             else:
                 main_block = current_chain.chain[max(eligible_block_ids)]
+            if not main_block:
+                return 'no block to be validated', 501
             response = main_block.to_dict()
             # Return the block with the highest index
             return response, 200
@@ -167,7 +173,9 @@ class ANode(Node):
             if not all(p in request.json for p in required):
                 return 'Missing required transaction data', 400
 
-            block = self.agent.publish_task()
+            current_max_block_idx = current_chain.chain[-1].index if current_chain.chain else -1
+            block = self.agent.publish_task(index=current_max_block_idx + 1)
+
             if block:
                 current_chain.add_new_block(block)
                 print(f"New block is published: {block}")
@@ -244,7 +252,7 @@ class VNode(Node):
         def validator_get_main_chain_block():
             # Iterate through current_chain to find the first block that has not been validated by the current address
             for block in current_chain.chain:
-                if block.index != 0:  # Only consider blocks with non-zero indices
+                if block.research_address.lower() != "authority":  # Only consider blocks with non-zero indices
                     # Check if the block has been validated by the current address
                     block_validated = False
 
@@ -296,21 +304,21 @@ if __name__ == '__main__':
     node0 = ANode(6000)
     node1 = Node(6001)
     node2 = VNode(6002)
-    # node3 = VNode(6003)
-    # node4 = VNode(6004)
+    node3 = VNode(6003)
+    node4 = VNode(6004)
 
     t_a = threading.Thread(target=run_authority)
     t0 = threading.Thread(target=node0.run)
     t1 = threading.Thread(target=node1.run)
     t2 = threading.Thread(target=node2.run)
-    # t3 = threading.Thread(target=node3.run)
-    # t4 = threading.Thread(target=node4.run)
+    t3 = threading.Thread(target=node3.run)
+    t4 = threading.Thread(target=node4.run)
 
 
     t_a.start()
     t0.start()
     t1.start()
     t2.start()
-    # t3.start()
-    # t4.start()
+    t3.start()
+    t4.start()
 

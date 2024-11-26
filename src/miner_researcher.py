@@ -1,3 +1,5 @@
+from anyio import current_time
+
 from miner import Miner
 
 import random
@@ -5,6 +7,7 @@ import requests
 import sys
 import wallet
 from time import sleep, time
+from datetime import datetime
 from numpy import average
 import re
 import blockchain
@@ -97,8 +100,9 @@ class MinerResearcher(Miner):
                 best_score, best_model_name, best_params = self.search_best_model(train_data, dev_data, previous_score)
                 best_model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
                 test_score = best_model.score(test_data[0], test_data[1])
-                self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "previous test score:", previous_test_score)
-                self.print(f"Train_data-{current_dataset_idx}. current dev score:", best_model.score(dev_data[0], dev_data[1]), "previous dev score:", previous_dev_score)
+                # self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "previous test score:", previous_test_score)
+                # self.print(f"Train_data-{current_dataset_idx}. current dev score:", best_model.score(dev_data[0], dev_data[1]), "previous dev score:", previous_dev_score)
+                # self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "previous test score:", previous_test_score)
 
                 if  best_score > previous_score:
                     valid = True
@@ -122,22 +126,26 @@ class MinerResearcher(Miner):
                         "block": block_data
                     }
                     response = requests.post(self.node_url + "/submitproof", json=response)
+
                     if response.status_code == 200:
                         successful_attempts += 1
                         failed_attempts = 0
-                        self.print(f"successfully mined {successful_attempts}")
+                        index = response.json()["index"]
+                        task_name = block.task_description
+                        self.print(f"Successfully mined Block-{index}. Dev score: {round(best_score, 2)}. Task: {task_name}. Total successful attempts: {successful_attempts}")
+                        sleep(1)
                         break
                     else:
-                        self.print("New solution is not valid")
+                        # self.print(f"New solution is not valid for Block-{block.index}")
                         current_dataset_idx += 1
-                        sleep(10)
+                        sleep(5)
                 else:
                     current_dataset_idx += 1
 
             if current_dataset_idx >= 10:
                 failed_attempts += 1
                 self.print("Failed to find a better model")
-                sleep(10)
+                sleep(20)
 
 
         self.print("Summary for this miner:")
@@ -145,7 +153,8 @@ class MinerResearcher(Miner):
         self.print(f"Failed attempts: {failed_attempts}")
 
     def print(self, *args):
-        print(f"{self.print_prefix} ", *args)
+        current_time = datetime.now().strftime("%H:%M:%S")
+        print(f"[{current_time}]{self.print_prefix} ", *args)
 
 
 

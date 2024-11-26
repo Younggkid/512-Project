@@ -1,3 +1,5 @@
+from anyio import current_time
+
 from miner import Miner
 
 import random
@@ -10,9 +12,11 @@ import re
 import blockchain
 import crypto
 from block import Block
+from datetime import datetime
 from utils import CodeSolution, run_model_code, load_pickle
 from miner_researcher import MinerResearcher
-
+import threading
+import numpy as np
 class MinerValidator(Miner):
     def __init__(self, NODE):
         super().__init__(NODE)
@@ -26,11 +30,14 @@ class MinerValidator(Miner):
         failed_attempts = 0
         successful_attempts = 0
         while True and failed_attempts < 10000:
+            # random sleep for 0-2 seconds
+            random.seed(int(time()) + int(self.port))
+            sleep(np.random.randint(0, 3))
             response = requests.get(self.node_url + "/VMainChainBlock")
             if response.status_code != 200:
                 # self.print("Failed to get main block")
                 failed_attempts += 1
-                sleep(10)
+                sleep(5)
                 continue
 
             main_block = response.json()
@@ -68,24 +75,33 @@ class MinerValidator(Miner):
             # publish the validation block
             response = requests.post(self.node_url + "/Vsubmitproof", json=json_data)
             if response.status_code == 200:
-                self.print("Validation block published")
+                self.print("Validation block published for block", main_block.index, "by Validator", self.port)
                 successful_attempts += 1
             else:
                 self.print("Validation block not published")
                 failed_attempts += 1
                 sleep(10)
     def print(self, *args):
-        print(f"{self.print_prefix} ", *args)
+        current_time = datetime.now().strftime("%H:%M:%S")
+        print(f"[{current_time}]{self.print_prefix} ", *args)
 
 
 if __name__ == "__main__":
     # researcher_node_url = f"http://127.0.0.1:6001"
-    node_url = f"http://127.0.0.1:6002"
-    miner_validator = MinerValidator(node_url)
+    node_url1 = f"http://127.0.0.1:6002"
+    node_url2 = f"http://127.0.0.1:6003"
+    node_url3 = f"http://127.0.0.1:6004"
+    miner_validator1 = MinerValidator(node_url1)
+    miner_validator2 = MinerValidator(node_url2)
+    miner_validator3 = MinerValidator(node_url3)
     # miner_researcher = MinerResearcher(researcher_node_url)
 
     # miner_researcher.mine()
-    miner_validator.mine()
+    t1 = threading.Thread(target=miner_validator1.mine).start()
+    t2 = threading.Thread(target=miner_validator2.mine).start()
+    t3 = threading.Thread(target=miner_validator3.mine).start()
+
+
 
 
 

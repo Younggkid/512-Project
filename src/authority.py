@@ -1,4 +1,3 @@
-from anyio import sleep
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
@@ -8,12 +7,14 @@ import crypto
 import wallet
 import requests
 
+
 from utils import load_pickle, save_pickle
 from block import Block
 from miner import Miner
 import numpy as np
 import time
 import json
+from time import sleep
 from utils import CodeSolution
 
 # For now, the current chain is a global variable
@@ -71,7 +72,7 @@ class AuthorityAgent:
         )
         return signature
 
-    def publish_task(self):
+    def publish_task(self,index=0):
         if len(self.task_name_queue) == 0:
             print("No task in the queue")
             return None
@@ -80,7 +81,7 @@ class AuthorityAgent:
         if self.current_task:
             self.task_history.append(self.current_task)
         self.current_task = Task(task_name)
-        print(f"New task published: {task_name}")
+        print(f"New task-{len(self.task_history)} published: {task_name}")
         # save the train data to a link in 10 pieces, make it convenient for the research miner to simulate the data increment process
         for i in range(10):
             data_len = len(self.current_task.train_data[0])
@@ -98,8 +99,8 @@ class AuthorityAgent:
 
         code_solution = CodeSolution("random", {})
         block = Block(research_address="authority",
-                        index=0,
-                        previous_block_id=0,
+                        index=index,
+                        previous_block_id=index-1,
                         task_description=task_name,
                         data_link=f"tmp/{task_name}_0",
                         code_link=code_solution,
@@ -142,7 +143,7 @@ class MinerAuthority(Miner):
                 continue
             if response.status_code == 200:
                 # print("Task published")
-                time.sleep(600)
+                time.sleep(60)
 
 
 
