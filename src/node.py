@@ -205,10 +205,11 @@ class ANode(Node):
 class VNode(Node):
     def __init__(self, port):
         super().__init__(port)
+        self.address = wallet.get_address(f"private_key_{port}.pem")
 
-    def setup_routes(self):
-        @self.app.route('/submitproof', methods=['POST'])
-        def submit_proof():
+    def vnode_setup_routes(self):
+        @self.app.route('/Vsubmitproof', methods=['POST'])
+        def validator_submit_proof():
             required = ['block', 'validator', 'vote']
             if not all(p in request.json for p in required):
                 return 'Missing required transaction data', 400
@@ -224,7 +225,7 @@ class VNode(Node):
             block.validation_status = vote
 
             REWARD = 0.001
-            # TODO
+
             validate_chain.add_new_block(block)
             block.add_new_transaction(
                 sender="0",
@@ -233,7 +234,7 @@ class VNode(Node):
             )
 
             response = {
-                'message': "New Block Valid",
+                'message': "New Block Validated",
                 'index': block.index,
                 'transactions': block.txs_list,
             }
@@ -241,38 +242,34 @@ class VNode(Node):
             return response, 200
 
 
-        @self.app.route('/MainChainBlock', methods=['GET'])
-        def get_main_chain_block():
-            # TODO Find the most recent confirmed block need to use validator chain
-            # Dictionary to count validation_state=True occurrences for each index
-            validation_counts = defaultdict(int)
+        @self.app.route('/VMainChainBlock', methods=['GET'])
+        def validator_get_main_chain_block():
+            # Iterate through current_chain to find the first block that has not been validated by the current address
+            for block in current_chain.chain:
+                if block.index != 0:  # Only consider blocks with non-zero indices
+                    # Check if the block has been validated by the current address
+                    block_validated = False
 
-            # Dictionary to store the latest block for each index
-            latest_blocks = {}
+                    # Iterate through the validate_chain to see if the block has been validated by the current address
+                    for validator_block in validate_chain.chain:
+                        if validator_block.index == block.index and validator_block.validator_address == self.address:
+                            # The current address has validated this block
+                            block_validated = True
+                            break  # No need to check further, we've found the current address validated it
 
-            # Count occurrences of validation_state=True per block index
-            for block in validate_chain.chain:
-                if block.validation_state:  # Only count blocks with validation_state=True
-                    validation_counts[block.index] += 1
-                    latest_blocks[block.index] = block  # Keep the latest block for the index
-
-            # Find the block with the maximum index that has at least 2 confirmations
-            eligible_blocks = [
-                block for index, block in latest_blocks.items() if validation_counts[index] >= 2
-            ]
-
-            if not eligible_blocks: # return the genius block
-                return validate_chain.chain[0].to_dict()
-            response = max(eligible_blocks, key=lambda block: block.index).to_dict()
-            # Return the block with the highest index
-            return response, 200
+                    # If the block has not been validated by the current address, return it
+                    if not block_validated:
+                        return block.to_dict(), 200  # Return the block as it hasn't been validated by the current address
+            
+            # If no block was found that hasn't been validated by the current address, return a message
+            return 'no block to be validated', 400
 
             
 
-        @self.app.route('/chain', methods=['GET'])
-        def full_chain():
+        @self.app.route('/Vchain', methods=['GET'])
+        def validator_full_chain():
             """
-            Returns the main chain, filtered to include only blocks that have at least
+            Returns the valid chain, filtered to include only blocks that have at least
             2 confirmations in the validator chain.
             """
             # Dictionary to count validation_state=True occurrences for each block index
@@ -295,25 +292,27 @@ class VNode(Node):
             return response, 200
 
 
-# Current we only hard code authority to run in 6000
-# Vnode runs in 6001,6002,6003
-# 
-if __name__ == '__main__':
-    node1 = ANode(6000)
-    node2 = Node(6001)
-    # node3 = Node(6002)
-    # node4 = Node(6003)
 
-    t0 = threading.Thread(target=run_authority)
+ 
+if __name__ == '__main__':
+    node0 = ANode(6000)
+    node1 = Node(6001)
+    node2 = VNode(6002)
+    node3 = VNode(6003)
+    node4 = VNode(6004)
+
+    t_a = threading.Thread(target=run_authority)
+    t0 = threading.Thread(target=node0.run)
     t1 = threading.Thread(target=node1.run)
     t2 = threading.Thread(target=node2.run)
-    # t3 = threading.Thread(target=node3.run)
-    # t4 = threading.Thread(target=node4.run)
+    t3 = threading.Thread(target=node3.run)
+    t4 = threading.Thread(target=node4.run)
 
 
+    t_a.start()
     t0.start()
     t1.start()
     t2.start()
-    # t3.start()
-    # t4.start()
+    t3.start()
+    t4.start()
 

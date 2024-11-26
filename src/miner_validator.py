@@ -24,7 +24,7 @@ class MinerValidator(Miner):
         failed_attempts = 0
         successful_attempts = 0
         while True and failed_attempts < 1:
-            main_block = requests.get(self.node_url + "/MainChainBlock").json()
+            main_block = requests.get(self.node_url + "/VMainChainBlock").json()
             main_block = Block.from_dict(main_block)
 
             # main_block = Block(
@@ -56,7 +56,7 @@ class MinerValidator(Miner):
             signature = self.auth_sign_block(validation_block)
             validation_block.digital_signature = signature
             # publish the validation block
-            response = requests.post(self.node_url + "/submitproof", json=validation_block.to_dict())
+            response = requests.post(self.node_url + "/Vsubmitproof", json=validation_block.to_dict())
             if response.status_code == 200:
                 print("Validation block published")
                 successful_attempts += 1
