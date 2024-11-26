@@ -1,3 +1,4 @@
+from anyio import sleep
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
@@ -9,6 +10,12 @@ import requests
 
 from utils import load_pickle, save_pickle
 from block import Block
+from miner import Miner
+import numpy as np
+import time
+import json
+from utils import CodeSolution
+
 # For now, the current chain is a global variable
 # We can change it to the local variable in every node
 
@@ -46,9 +53,9 @@ class AuthorityAgent:
     def __init__(self, task_data_path="data"):
         self.private_key = wallet.read_key("private_key.pem")
         self.task_name_queue = ["digits", "iris"]
+        self.task_name_queue = self.task_name_queue * 10
         self.current_task = None
         self.task_history = []
-        self.publish_task()
 
 
     def auth_sign_block(self, block):
@@ -64,7 +71,11 @@ class AuthorityAgent:
         return signature
 
     def publish_task(self):
+        if len(self.task_name_queue) == 0:
+            print("No task in the queue")
+            return None
         task_name = self.task_name_queue.pop(0)
+        task_name = self.task_name_queue[0]
         if self.current_task:
             self.task_history.append(self.current_task)
         self.current_task = Task(task_name)
@@ -72,14 +83,32 @@ class AuthorityAgent:
         # save the train data to a link in 10 pieces, make it convenient for the research miner to simulate the data increment process
         for i in range(10):
             data_len = len(self.current_task.train_data[0])
-            data_start = i * data_len // 10
             data_start = 0
             data_end = (i + 1) * data_len // 10
             save_pickle([self.current_task.train_data[0][data_start:data_end],
                          self.current_task.train_data[1][data_start:data_end]], f"tmp/{task_name}_{i}/train.pkl")
             save_pickle(self.current_task.unlabeled_data, f"tmp/{task_name}_{i}/unlabeled.pkl")
         # TODO broadcast the task to the network
-        return task_name
+        predictions = [0] * len(self.current_task.test_data[1])
+
+
+
+        code_solution = CodeSolution("random", {})
+        block = Block(research_address="authority",
+                        index=0,
+                        previous_block_id=0,
+                        task_description=task_name,
+                        data_link=f"tmp/{task_name}_0",
+                        code_link=code_solution,
+                        constraint="constraint",
+                        validator_address=None,
+                        predictions=predictions,
+                        state=None,
+                        txs_list=None,
+                        digital_signature=None)
+        signature = self.auth_sign_block(block)
+        block.state = signature
+        return block
 
 
 
@@ -93,12 +122,49 @@ class AuthorityAgent:
 
         return is_best, signature
 
+class MinerAuthority(Miner):
+    def __init__(self, NODE):
+        super().__init__(NODE)
+        self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
+        print('Miner Authority initialized!')
+
+
+    def mine(self):
+        while True:
+            response = requests.post(self.node_url + "/publishtask", json={})
+            break
+            try:
+                response = requests.post(self.node_url + "/publishtask", json={})
+            except Exception as error:
+                print(f'{error}')
+                return
+                time.sleep(10)
+                continue
+            if response.status_code == 200:
+                print("Task published")
+                break
+                time.sleep(60)
+
+
+
+
 
 if __name__ == "__main__":
-    agent = AuthorityAgent()
-    predictions = agent.current_task.test_data[1]
-    block = Block("research_address", 1, "previous_block_id", "task_description", "data_link", "code_link", "constraint", "validator_address", ["predictions"], "state", True, [{"sender": "sender", "recipient": "recipient", "amount": 1}], None)
-    block.predictions = [0] * len(predictions)
-    is_best, signature = agent.verify_block(block)
-    block.predictions = predictions
-    is_best, signature = agent.verify_block(block)
+    # agent = AuthorityAgent()
+    # agent.publish_task()
+    # predictions = agent.current_task.test_data[1]
+    # block = Block("research_address", 1, "previous_block_id", "task_description", "data_link", "code_link", "constraint", "validator_address", ["predictions"], "state", True, [{"sender": "sender", "recipient": "recipient", "amount": 1}], None)
+    # block.predictions = [0] * len(predictions)
+    # is_best, signature = agent.verify_block(block)
+    # block.predictions = predictions
+    # is_best, signature = agent.verify_block(block)
+
+
+
+    miner = MinerAuthority("http://127.0.0.1:6000")
+    try:
+        miner.mine()
+    except Exception as error:
+        print(f'Connection error - {error}')
+        print()
+        print('Please check your internet connection. Is the node online?')

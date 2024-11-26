@@ -40,6 +40,13 @@ class CodeSolution:
     def __str__(self):
         return f"Model: {self.model_name}, Parameters: {self.parameters}"
 
+    def to_dict(self):
+        return {"model_name": self.model_name, "parameters": self.parameters}
+
+    @staticmethod
+    def from_dict(data):
+        return CodeSolution(data["model_name"], data["parameters"])
+
 class RandomModel:
     def __init__(self):
         self.model_name = "random"

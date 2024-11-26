@@ -4,10 +4,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from typing import List, Dict, Union
 from utils import CodeSolution
-class BlockState(Enum):
-    SEMI_CONFIRM = "semi-confirm"
-    CONFIRM = "confirm"
-    MINED = "mined"
+import json
 
 
 class Block:
@@ -85,12 +82,21 @@ class Block:
             return True
         except Exception:
             return False
-    
+        
+    def add_new_transaction(self,sender, recipient, amount):
+        self.txs_list.append(
+            {
+                'sender': sender,
+                'recipient': recipient,
+                'amount': amount,
+            })
+
     def to_dict(self) -> Dict[str, Union[str, int, bool, bytes, List[Dict], List[str], None]]:
         """
         Converts the block's attributes to a dictionary.
         :return: A dictionary representation of the block.
         """
+        self.code_link = self.code_link.to_dict() if self.code_link else None
         return {
             'research_address': self.research_address,
             'validator_address': self.validator_address,
@@ -101,8 +107,38 @@ class Block:
             'code_link': self.code_link,
             'constraint': self.constraint,
             'predictions': self.predictions,
-            'state': self.state,
+            'state': self.state.hex() if self.state else None,
             'validation_state': self.validation_state,
             'txs_list': self.txs_list,
             'digital_signature': self.digital_signature.hex() if self.digital_signature else None,
         }
+    def to_json(self) -> str:
+        """
+        Converts the block's attributes to a JSON string.
+        :return: A JSON string representation of the block.
+        """
+        return json.dumps(self.to_dict())
+    
+    @staticmethod
+    def from_dict(data: Dict[str, Union[str, int, bool, None, List[Dict], List[str]]]) -> 'Block':
+        """
+        Creates a Block object from a dictionary.
+        :param data: A dictionary representation of a Block.
+        :return: A Block object.
+        """
+        code_link = CodeSolution.from_dict(data['code_link']) if data['code_link'] else None
+        return Block(
+            research_address=data['research_address'],
+            index=data['index'],
+            previous_block_id=data['previous_block_id'],
+            task_description=data['task_description'],
+            data_link=data['data_link'],
+            code_link=code_link,
+            constraint=data['constraint'],
+            validator_address=data.get('validator_address'),
+            predictions=data.get('predictions', []),
+            state=data.get('state'),
+            validation_state=data.get('validation_state'),
+            txs_list=data.get('txs_list', []),
+            digital_signature=bytes.fromhex(data['digital_signature']) if data.get('digital_signature') else None,
+        )
