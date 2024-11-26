@@ -25,12 +25,13 @@ class Miner(object):
         try:
             # Use wallet's get_address function to retrieve miner address
             self.mining_address = wallet.get_address(private_key_filename)  
-            print('Miner address:', self.mining_address)
+            # print('Miner address:', self.mining_address)
         except FileNotFoundError:
             print("'private_key.pem' not detected! Run 'run_wallet.py' first to generate keys!", file=sys.stderr)
             sys.exit(0)
         #self.mining_address = wallet.get_address("private_key.pem") 
-        print('Miner initialized!')
+        # print('Miner initialized!')
+        self.print_prefix = f"Miner - {self.port}:"
 
     @property
     def current_chain(self):
@@ -98,3 +99,6 @@ class Miner(object):
     def print(self, *args):
         current_time = datetime.now().strftime("%H:%M:%S")
         print(f"[{current_time}]{self.print_prefix} ", *args)
+
+    def initialize_print(self):
+        self.print(f"Miner initialized in Port {self.port} with address {self.mining_address}")

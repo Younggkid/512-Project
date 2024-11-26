@@ -130,8 +130,9 @@ class MinerAuthority(Miner):
     def __init__(self, NODE):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
-        print('Miner Authority initialized!')
-        self.print_prefix = f"Authority - {self.port}:"
+
+        self.print_prefix = f"AMiner - {self.port}:"
+        self.initialize_print()
 
 
     def mine(self):

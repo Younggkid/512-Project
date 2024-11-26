@@ -22,7 +22,7 @@ class MinerValidator(Miner):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
         self.print_prefix = f"VMiner - {self.port}:"
-        print('Miner Validator initialized!')
+        self.initialize_print()
 
 
 

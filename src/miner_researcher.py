@@ -32,10 +32,10 @@ class MinerResearcher(Miner):
     def __init__(self, NODE):
         super().__init__(NODE)
         self.mining_address = wallet.get_address(f"private_key_{self.port}.pem")
-        print(f'Miner Researcher initialized in port {self.port}!')
         self.model_sets = ["logistic_regression", "svm"]
         self.parameters_list = init_parameters_list()
         self.print_prefix = f"RMiner - {self.port}:"
+        self.initialize_print()
 
 
     def search_best_model(self, train_data, dev_data, previous_score):
