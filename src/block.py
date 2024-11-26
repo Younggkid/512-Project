@@ -3,21 +3,23 @@ from enum import Enum
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from typing import List, Dict, Union
+from utils import CodeSolution
 class BlockState(Enum):
     SEMI_CONFIRM = "semi-confirm"
     CONFIRM = "confirm"
     MINED = "mined"
+
 
 class Block:
     def __init__(
         self,
         research_address: str,
         index: int,
-        previous_block_id: str,
+        previous_block_id: int,
         task_description: str,
         data_link: str,
-        code_link: str,
         constraint: str,
+        code_link: CodeSolution = None,
         validator_address: Union[str, None] = None,
         predictions: List[str] = None,
         state: Union[None, str] = None,

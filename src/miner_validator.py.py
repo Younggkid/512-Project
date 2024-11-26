@@ -9,6 +9,8 @@ from numpy import average
 import re
 import blockchain
 import crypto
+from block import Block
+from utils import CodeSolution, run_model_code, load_pickle
 
 class MinerValidator(Miner):
     def __init__(self, NODE):
@@ -17,32 +19,32 @@ class MinerValidator(Miner):
         print('Miner Validator initialized!')
 
 
-    def validate(self):
+    def validate(self, block: Block):
         pass
 
     def mine(self):
-        while True:
-            while requests.get(self.node_url + "/work").status_code == 204:  # Empty
-                sleep(2)
+        # main_block = requests.get(self.node_url + "/chain").json()["chain"][-1]
+        main_block = Block(
+            research_address="research_address",
+            index=0,
+            previous_block_id=0,
+            task_description="task_description",
+            data_link=f"tmp/digits_0",
+            constraint="constraint",
+            code_link=CodeSolution("logistic_regression", {"C": 0.01, "max_iter": 100}),
+            predictions=[0]*10,
+        )
+        train_data = load_pickle(main_block.data_link + "/train.pkl")
+        unlabeled_data = load_pickle(main_block.data_link + "/unlabeled.pkl")
+        reproduced_model = run_model_code(main_block, main_block.code_link)
+        predictions = reproduced_model.predict(unlabeled_data)
+        # compare the predictions with the main block's predictions
+        main_block_valid = False
+        if predictions == main_block.predictions:
+            main_block_valid = True
 
-            response = requests.get(self.node_url + "/work")
+        # create a new block
 
-            # 1. Find the main block to be verified
-            main_block = requests.get(self.node_url + "/chain").json()["chain"][-1]
-            # 2. Reproduce the main block's result
-            # 3. Submit the result to the node
 
-            proof = self.validate(response.json())
-            print(f'Proof found: {proof}')
-            print('Sending now to node...')
-            if requests.get(self.node_url + "/work").status_code == 200:  # worked
-                print('Success! You have been rewarded with 1 $TR (to be added in next block)')
-                print()
-            else:
-                print('Error! Did not send block in on-time!')
-                print()
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            requests.post(self.node_url + "/submitproof", headers=headers, data={
-                "proof": proof,
-                "miner": self.mining_address
-            })
+
+
