@@ -107,7 +107,7 @@ class Node:
             ]
             # TODO change to verify according to signature
             authority_block_ids = [block.index for block in current_chain.chain if block.research_address.lower() == "authority"]
-            eligible_block_ids = eligible_block_ids.extend(authority_block_ids)
+            eligible_block_ids.extend(authority_block_ids)
 
             if not eligible_block_ids: # return the genius block
                 main_block = current_chain.chain[0]

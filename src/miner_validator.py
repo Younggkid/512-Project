@@ -25,12 +25,12 @@ class MinerValidator(Miner):
     def mine(self):
         failed_attempts = 0
         successful_attempts = 0
-        while True and failed_attempts < 20:
+        while True and failed_attempts < 10000:
             response = requests.get(self.node_url + "/VMainChainBlock")
             if response.status_code != 200:
-                self.print("Failed to get main block")
+                # self.print("Failed to get main block")
                 failed_attempts += 1
-                sleep(5)
+                sleep(10)
                 continue
 
             main_block = response.json()

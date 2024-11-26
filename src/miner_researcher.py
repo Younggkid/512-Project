@@ -56,7 +56,7 @@ class MinerResearcher(Miner):
     def mine(self):
         failed_attempts = 0
         successful_attempts = 0
-        while True and failed_attempts < 20:
+        while True and failed_attempts < 10:
             # shuffle the self.parameters_list
             for model_name in self.model_sets:
                 random.shuffle(self.parameters_list[model_name])
@@ -83,7 +83,7 @@ class MinerResearcher(Miner):
             previous_score = previous_model.score(dev_data[0], dev_data[1])
             previous_test_score = previous_model.score(test_data[0], test_data[1])
             previous_dev_score = previous_model.score(dev_data[0], dev_data[1])
-            self.print("previous test score", previous_test_score, "previous dev score", previous_dev_score)
+            # self.print("previous test score", previous_test_score, "previous dev score", previous_dev_score)
 
             # Model selection and add data if needed
             while True and current_dataset_idx < 10:
@@ -97,45 +97,49 @@ class MinerResearcher(Miner):
                 best_score, best_model_name, best_params = self.search_best_model(train_data, dev_data, previous_score)
                 best_model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
                 test_score = best_model.score(test_data[0], test_data[1])
-                self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "best score:", best_score)
+                self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "previous test score:", previous_test_score)
+                self.print(f"Train_data-{current_dataset_idx}. current dev score:", best_model.score(dev_data[0], dev_data[1]), "previous dev score:", previous_dev_score)
 
                 if  best_score > previous_score:
                     valid = True
-                    break
+                    model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
+
+                    result = model.score(test_data[0], test_data[1])
+                    predictions = model.predict(unlabeled_data).tolist()
+
+                    block = Block(
+                        research_address=self.mining_address,
+                        index=previous_block.index + 1,
+                        previous_block_id=previous_block.index,
+                        task_description=previous_block.task_description,
+                        data_link=f"{dataset_path}_{current_dataset_idx}",
+                        constraint=previous_block.constraint,
+                        code_link=CodeSolution(best_model_name, best_params),
+                        predictions=predictions
+                    )
+                    block_data = block.to_dict()
+                    response = {
+                        "block": block_data
+                    }
+                    response = requests.post(self.node_url + "/submitproof", json=response)
+                    if response.status_code == 200:
+                        successful_attempts += 1
+                        failed_attempts = 0
+                        self.print(f"successfully mined {successful_attempts}")
+                        break
+                    else:
+                        self.print("New solution is not valid")
+                        current_dataset_idx += 1
+                        sleep(10)
                 else:
                     current_dataset_idx += 1
 
-
-            if valid:
-                model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
-
-                result = model.score(test_data[0], test_data[1])
-                predictions = model.predict(unlabeled_data).tolist()
-
-                block = Block(
-                    research_address=self.mining_address,
-                    index=previous_block.index + 1,
-                    previous_block_id=previous_block.index,
-                    task_description=previous_block.task_description,
-                    data_link=f"{dataset_path}_{current_dataset_idx}",
-                    constraint=previous_block.constraint,
-                    code_link=CodeSolution(best_model_name, best_params),
-                    predictions=predictions
-                )
-                block_data = block.to_dict()
-                response = {
-                    "block": block_data
-                }
-                response = requests.post(self.node_url+"/submitproof", json=response)
-                if response.status_code == 200:
-                    successful_attempts += 1
-                    self.print(f"successfully mined {successful_attempts}")
-                else:
-                    failed_attempts += 1
-                    self.print("New solution is not valid")
-                    sleep(10)
-            else:
+            if current_dataset_idx >= 10:
                 failed_attempts += 1
+                self.print("Failed to find a better model")
+                sleep(10)
+
+
         self.print("Summary for this miner:")
         self.print(f"Successful attempts: {successful_attempts}")
         self.print(f"Failed attempts: {failed_attempts}")
