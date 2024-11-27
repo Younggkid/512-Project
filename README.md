@@ -10,7 +10,10 @@ Source code for Compsci512 course project
 - [Cryptography 3.4.7](https://pypi.org/project/cryptography/)
 
 install all the requirements：
-`pip3 install -r requirements.txt`
+```shell
+pip3 install -r requirements.txt
+cd src
+````
 
 ## Initialization
 First, initial the private keys and addresses for different nodes by running:
@@ -23,7 +26,7 @@ python3 run_wallet.py
 Then, start node server:
 
 ```shell
-`python3 node.py`
+python3 node.py
 ```
 It should have seven nodes running on different port based on Flask framework. One node is the authority node, and three are research nodes, and the other three are the validation nodes.
 
@@ -37,5 +40,5 @@ python3 run_miner.py
 
 Note the port should be the same for the same node, miner, and wallet.
 
-
+Results will be output in the `output.txt` file.
 [//]: # (Use the command line tool created by `run_wallet.py` to send money)
