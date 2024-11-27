@@ -41,4 +41,4 @@ python3 run_miner.py
 Note the port should be the same for the same node, miner, and wallet.
 
 Results will be output in the `output.txt` file.
-[//]: # (Use the command line tool created by `run_wallet.py` to send money)
+
