@@ -1,5 +1,7 @@
 # 512-Project
+## Dual Chain Design: Large for Proof-of-Useful-Work
 Source code for Compsci512 course project
+
 
 ## Set-Up
 
