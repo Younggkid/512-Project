@@ -37,7 +37,7 @@ validator_node_urls = [
     "http://127.0.0.1:6006"]
 
 with open("output.txt", "w", buffering=1) as f:
-    sys.stdout = f
+    # sys.stdout = f
     t = threading.Thread(target=MinerAuthority(authority_node_url).mine)
     t.start()
     sleep(1)
@@ -48,6 +48,6 @@ with open("output.txt", "w", buffering=1) as f:
     for node_url in validator_node_urls:
         threading.Thread(target=MinerValidator(node_url).mine).start()
     t.join()
-    sys.stdout = sys.__stdout__
+    # sys.stdout = sys.__stdout__
 
 

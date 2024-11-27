@@ -80,9 +80,6 @@ class MinerResearcher(Miner):
             test_data = load_pickle(os.path.join(f"data/{task_name}_test.pkl"))
 
 
-            valid = False
-            best_model_name = None
-            best_params = None
             previous_model = run_model_code(train_data, previous_block.code_link)
             previous_score = previous_model.score(dev_data[0], dev_data[1])
             previous_test_score = previous_model.score(test_data[0], test_data[1])
@@ -106,7 +103,6 @@ class MinerResearcher(Miner):
                 # self.print(f"Train_data-{current_dataset_idx}. current test score:", test_score, "previous test score:", previous_test_score)
 
                 if  best_score > previous_score:
-                    valid = True
                     model = run_model_code(train_data, CodeSolution(best_model_name, best_params))
 
                     predictions = model.predict(unlabeled_data).tolist()
